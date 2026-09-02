@@ -1,0 +1,17 @@
+{
+    "project": "CyberShield AI",
+    "model": "XGBoost",
+    "model_file": "xgboost_baseline.joblib",
+    "num_features": 40,
+    "num_classes": 15,
+    "random_state": 42,
+    "n_estimators": 100,
+    "max_depth": 8,
+    "learning_rate": 0.1,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "objective": "multi:softprob",
+    "primary_metric": "macro_f1",
+    "test_accuracy": 0.9988,
+    "test_macro_f1": 0.9240
+}

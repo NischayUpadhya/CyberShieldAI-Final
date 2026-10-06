@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes import dashboard
 from app.routes import threats
 from app.routes import xgboost
+from app.routes import blockchain
 
 app = FastAPI(
     title="CyberShield AI API",
@@ -44,3 +45,4 @@ def root():
 app.include_router(dashboard.router)
 app.include_router(threats.router)
 app.include_router(xgboost.router)
+app.include_router(blockchain.router)

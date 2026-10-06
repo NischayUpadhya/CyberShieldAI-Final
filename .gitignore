@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# CyberShield AI - Runtime Blockchain Data
+backend/blockchain/data/
+
+# Large XGBoost test artifacts
+backend/ai/datasets/

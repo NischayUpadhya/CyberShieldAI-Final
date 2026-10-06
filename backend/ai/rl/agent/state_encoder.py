@@ -3,6 +3,11 @@ File        : state_encoder.py
 Project     : CyberShield AI
 Description : Converts cybersecurity information into a normalized
               numerical state vector for the reinforcement learning agent.
+
+V5:
+    - Attack type is one-hot encoded.
+    - Previous action is one-hot encoded.
+    - Continuous features are normalized to [0, 1].
 """
 
 from __future__ import annotations
@@ -12,28 +17,47 @@ import numpy as np
 
 class CyberDefenseStateEncoder:
     """
-    Encodes the current cybersecurity environment state into
-    a fixed-size numerical vector.
+    Encodes the current cybersecurity environment state.
 
-    State:
-        0 - Attack type
-        1 - XGBoost confidence
-        2 - Threat severity
-        3 - Packet rate
-        4 - Byte rate
-        5 - Active threats
-        6 - Previous action
-        7 - Available resources
+    State layout:
+
+        0 - 13   : Attack type (14 one-hot features)
+        14       : XGBoost confidence
+        15       : Threat severity
+        16       : Packet rate
+        17       : Byte rate
+        18       : Active threats
+        19 - 23  : Previous action (5 one-hot features)
+        24       : Available resources
+
+    Total state size = 26
     """
 
-    STATE_SIZE = 8
+    NUM_ATTACK_TYPES = 15
+    NUM_ACTIONS = 5
+
+    # 15 attack types:
+    # 0 = Benign
+    # 1 = Bot
+    # 2 = DDoS
+    # ...
+    # 14 = Web Attack - XSS
+
+    STATE_SIZE = (
+        NUM_ATTACK_TYPES
+        + 1                       # XGBoost confidence
+        + 1                       # Threat severity
+        + 1                       # Packet rate
+        + 1                       # Byte rate
+        + 1                       # Active threats
+        + NUM_ACTIONS             # Previous action
+        + 1                       # Available resources
+    )
 
     def __init__(self) -> None:
-        self.attack_type_max = 14.0
         self.packet_rate_max = 100000.0
         self.byte_rate_max = 100000000.0
         self.active_threats_max = 100.0
-        self.action_max = 4.0
         self.resources_max = 100.0
 
     def encode(
@@ -48,22 +72,64 @@ class CyberDefenseStateEncoder:
         available_resources: float,
     ) -> np.ndarray:
         """
-        Convert raw cybersecurity state information into
-        a normalized NumPy state vector.
+        Convert raw cybersecurity information into a normalized
+        state vector.
 
         Returns:
-            np.ndarray with shape (8,)
+            np.ndarray with shape (25,)
         """
 
-        state = np.array(
+        # ---------------------------------------------------------
+        # Attack type: one-hot encoding
+        # ---------------------------------------------------------
+        attack_vector = np.zeros(
+            self.NUM_ATTACK_TYPES,
+            dtype=np.float32,
+        )
+
+        attack_type = int(
+            np.clip(
+                attack_type,
+                0,
+                self.NUM_ATTACK_TYPES - 1,
+            )
+        )
+
+        attack_vector[attack_type] = 1.0
+
+        # ---------------------------------------------------------
+        # Previous action: one-hot encoding
+        # ---------------------------------------------------------
+        action_vector = np.zeros(
+            self.NUM_ACTIONS,
+            dtype=np.float32,
+        )
+
+        previous_action = int(
+            np.clip(
+                previous_action,
+                0,
+                self.NUM_ACTIONS - 1,
+            )
+        )
+
+        action_vector[previous_action] = 1.0
+
+        # ---------------------------------------------------------
+        # Continuous state features
+        # ---------------------------------------------------------
+        continuous_features = np.array(
             [
-                self._normalize(
-                    attack_type,
+                self._clip(
+                    xgboost_confidence,
                     0.0,
-                    self.attack_type_max,
+                    1.0,
                 ),
-                self._clip(xgboost_confidence, 0.0, 1.0),
-                self._clip(threat_severity, 0.0, 1.0),
+                self._clip(
+                    threat_severity,
+                    0.0,
+                    1.0,
+                ),
                 self._normalize(
                     packet_rate,
                     0.0,
@@ -80,11 +146,6 @@ class CyberDefenseStateEncoder:
                     self.active_threats_max,
                 ),
                 self._normalize(
-                    previous_action,
-                    0.0,
-                    self.action_max,
-                ),
-                self._normalize(
                     available_resources,
                     0.0,
                     self.resources_max,
@@ -92,6 +153,18 @@ class CyberDefenseStateEncoder:
             ],
             dtype=np.float32,
         )
+
+        # ---------------------------------------------------------
+        # Final state
+        # ---------------------------------------------------------
+        state = np.concatenate(
+            [
+                attack_vector,
+                continuous_features[:5],
+                action_vector,
+                continuous_features[5:],
+            ]
+        ).astype(np.float32)
 
         return state
 
@@ -103,7 +176,13 @@ class CyberDefenseStateEncoder:
     ) -> float:
         """Clip a value to the specified range."""
 
-        return float(np.clip(value, minimum, maximum))
+        return float(
+            np.clip(
+                value,
+                minimum,
+                maximum,
+            )
+        )
 
     @staticmethod
     def _normalize(
@@ -118,29 +197,38 @@ class CyberDefenseStateEncoder:
                 "Maximum value must be greater than minimum value."
             )
 
-        value = float(np.clip(value, minimum, maximum))
+        value = float(
+            np.clip(
+                value,
+                minimum,
+                maximum,
+            )
+        )
 
-        return (value - minimum) / (maximum - minimum)
+        return (
+            (value - minimum)
+            / (maximum - minimum)
+        )
 
 
 def main() -> None:
-    """Run a basic state encoder test."""
+    """Run a basic V5 state encoder test."""
 
     encoder = CyberDefenseStateEncoder()
 
     state = encoder.encode(
-        attack_type=10,
+        attack_type=2,             # DDoS
         xgboost_confidence=0.97,
         threat_severity=0.85,
         packet_rate=5000,
         byte_rate=5000000,
         active_threats=5,
-        previous_action=2,
+        previous_action=2,         # RATE_LIMIT
         available_resources=75,
     )
 
     print("=" * 70)
-    print("CYBERSHIELD AI - STATE ENCODER TEST")
+    print("CYBERSHIELD AI - V5 STATE ENCODER TEST")
     print("=" * 70)
 
     print("\nEncoded State:")
@@ -158,10 +246,61 @@ def main() -> None:
     print("\nMaximum Value:")
     print(state.max())
 
-    if state.shape == (CyberDefenseStateEncoder.STATE_SIZE,):
-        print("\nState encoder test: PASSED")
+    # ---------------------------------------------------------
+    # Validation
+    # ---------------------------------------------------------
+    attack_sum = state[:encoder.NUM_ATTACK_TYPES].sum()
+
+    action_start = (
+        encoder.NUM_ATTACK_TYPES + 5
+    )
+
+    action_end = (
+        action_start + encoder.NUM_ACTIONS
+    )
+
+    action_sum = state[
+        action_start:action_end
+    ].sum()
+
+    valid_shape = (
+        state.shape
+        == (CyberDefenseStateEncoder.STATE_SIZE,)
+    )
+
+    valid_attack_encoding = (
+        attack_sum == 1.0
+    )
+
+    valid_action_encoding = (
+        action_sum == 1.0
+    )
+
+    if (
+        valid_shape
+        and valid_attack_encoding
+        and valid_action_encoding
+    ):
+        print("\nV5 state encoder test: PASSED")
     else:
-        print("\nState encoder test: FAILED")
+        print("\nV5 state encoder test: FAILED")
+
+        print(
+            f"Expected shape: "
+            f"({CyberDefenseStateEncoder.STATE_SIZE},)"
+        )
+
+        print(
+            f"Actual shape: {state.shape}"
+        )
+
+        print(
+            f"Attack one-hot sum: {attack_sum}"
+        )
+
+        print(
+            f"Action one-hot sum: {action_sum}"
+        )
 
     print("=" * 70)
 

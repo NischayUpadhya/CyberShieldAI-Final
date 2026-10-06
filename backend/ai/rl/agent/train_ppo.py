@@ -14,6 +14,7 @@ import sys
 import time
 from pathlib import Path
 
+
 # =============================================================================
 # Project Path
 # =============================================================================
@@ -22,6 +23,7 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
+
 
 # =============================================================================
 # Stable Baselines
@@ -57,14 +59,14 @@ MODEL_DIR.mkdir(
     exist_ok=True,
 )
 
-MODEL_PATH = MODEL_DIR / "cybershield_ppo"
+MODEL_PATH = MODEL_DIR / "cybershield_ppo_v5"
 
 
 # =============================================================================
-# Training Configuration
+# V5 Training Configuration
 # =============================================================================
 
-TOTAL_TIMESTEPS = 100_000
+TOTAL_TIMESTEPS = 500_000
 
 LEARNING_RATE = 3e-4
 
@@ -91,7 +93,7 @@ SEED = 42
 
 def create_environment():
     """
-    Create the integrated CyberShield RL environment.
+    Create the integrated CyberShield V5 RL environment.
     """
 
     try:
@@ -122,22 +124,24 @@ def create_environment():
 
 def validate_environment(env) -> None:
     """
-    Validate that the environment follows the agreed RL interface.
+    Validate that the V5 environment follows the required RL interface.
     """
 
     logging.info(
-        "Validating CyberShield environment..."
+        "Validating CyberShield V5 environment..."
     )
 
     # -------------------------------------------------------------------------
     # Observation space
     # -------------------------------------------------------------------------
 
-    if env.observation_space.shape != (8,):
+    expected_observation_shape = (26,)
+
+    if env.observation_space.shape != expected_observation_shape:
 
         raise ValueError(
             "Invalid observation space.\n"
-            "Expected shape: (8,)\n"
+            f"Expected shape: {expected_observation_shape}\n"
             f"Received: {env.observation_space.shape}"
         )
 
@@ -171,11 +175,11 @@ def validate_environment(env) -> None:
         seed=SEED
     )
 
-    if observation.shape != (8,):
+    if observation.shape != expected_observation_shape:
 
         raise ValueError(
             "Invalid reset observation shape.\n"
-            "Expected: (8,)\n"
+            f"Expected: {expected_observation_shape}\n"
             f"Received: {observation.shape}"
         )
 
@@ -191,10 +195,12 @@ def validate_environment(env) -> None:
         env.step(0)
     )
 
-    if observation.shape != (8,):
+    if observation.shape != expected_observation_shape:
 
         raise ValueError(
-            "Invalid step observation shape."
+            "Invalid step observation shape.\n"
+            f"Expected: {expected_observation_shape}\n"
+            f"Received: {observation.shape}"
         )
 
     if not isinstance(
@@ -242,7 +248,7 @@ def train() -> None:
     start_time = time.time()
 
     logging.info(
-        "Starting CyberShield PPO training..."
+        "Starting CyberShield AI V5 PPO training..."
     )
 
     # -------------------------------------------------------------------------
@@ -264,7 +270,7 @@ def train() -> None:
     # -------------------------------------------------------------------------
 
     logging.info(
-        "Creating PPO model..."
+        "Creating PPO V5 model..."
     )
 
     model = PPO(
@@ -293,7 +299,7 @@ def train() -> None:
     )
 
     logging.info(
-        "PPO model created successfully."
+        "PPO V5 model created successfully."
     )
 
     # -------------------------------------------------------------------------
@@ -301,7 +307,7 @@ def train() -> None:
     # -------------------------------------------------------------------------
 
     logging.info(
-        "Training PPO for %d timesteps...",
+        "Training PPO V5 for %d timesteps...",
         TOTAL_TIMESTEPS,
     )
 
@@ -310,7 +316,7 @@ def train() -> None:
     )
 
     logging.info(
-        "PPO training completed."
+        "PPO V5 training completed."
     )
 
     # -------------------------------------------------------------------------
@@ -322,7 +328,7 @@ def train() -> None:
     )
 
     logging.info(
-        "PPO model saved to: %s",
+        "PPO V5 model saved to: %s",
         MODEL_PATH,
     )
 
@@ -348,7 +354,7 @@ def train() -> None:
     )
 
     print(
-        "CYBERSHIELD AI - PPO TRAINING"
+        "CYBERSHIELD AI - PPO V5 TRAINING"
     )
 
     print(
@@ -358,6 +364,16 @@ def train() -> None:
     print(
         f"Training Timesteps : "
         f"{TOTAL_TIMESTEPS:,}"
+    )
+
+    print(
+        f"Observation Size   : "
+        f"26"
+    )
+
+    print(
+        f"Action Count       : "
+        f"5"
     )
 
     print(
@@ -378,6 +394,11 @@ def train() -> None:
     print(
         f"GAE Lambda         : "
         f"{GAE_LAMBDA}"
+    )
+
+    print(
+        f"Entropy Coefficient: "
+        f"{ENT_COEF}"
     )
 
     print(

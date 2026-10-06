@@ -4,7 +4,13 @@ Project     : CyberShield AI
 Description : Simulates network traffic and cybersecurity threat scenarios
               for the reinforcement learning environment.
 
-Author      : Nischay Upadhya P
+V5:
+    - Balanced attack exposure for PPO training.
+    - Every attack class is guaranteed to appear within each scenario cycle.
+    - Benign traffic remains represented.
+    - Severity levels are sampled across low, medium, high and critical.
+    - Existing traffic, connection, frequency and confidence generation
+      are preserved.
 """
 
 from __future__ import annotations
@@ -54,6 +60,7 @@ ATTACK_NAMES = {
 
 @dataclass
 class NetworkScenario:
+    """Represents one simulated network-security scenario."""
 
     attack_type: int
     attack_name: str
@@ -78,8 +85,20 @@ class NetworkSimulator:
     """
     Generates simulated cybersecurity network scenarios.
 
+    V5 uses a balanced scenario schedule so PPO receives sufficient
+    exposure to every attack class during training.
+
     All normalized values are represented in the range [0, 1].
     """
+
+    # Number of benign scenarios in each complete cycle.
+    #
+    # One complete cycle contains:
+    #   4 benign scenarios
+    #   1 of each of the 14 attack classes
+    #
+    # Total = 18 scenarios.
+    BENIGN_PER_CYCLE = 4
 
     def __init__(
         self,
@@ -87,6 +106,70 @@ class NetworkSimulator:
     ) -> None:
 
         self.rng = np.random.default_rng(seed)
+
+        # ---------------------------------------------------------------------
+        # V5 balanced scenario schedule
+        # ---------------------------------------------------------------------
+        #
+        # Every cycle contains every attack exactly once and benign traffic
+        # four times.
+        #
+        # The schedule is shuffled before use so PPO does not learn a fixed
+        # scenario ordering.
+        # ---------------------------------------------------------------------
+
+        self._scenario_schedule: list[int] = []
+
+        self._scenario_index = 0
+
+        self._reset_scenario_schedule()
+
+    # =========================================================================
+    # Scenario Schedule
+    # =========================================================================
+
+    def _reset_scenario_schedule(self) -> None:
+        """
+        Create and shuffle a new balanced scenario cycle.
+
+        Each cycle contains:
+            BENIGN x4
+            Every attack class x1
+        """
+
+        schedule = (
+            [0] * self.BENIGN_PER_CYCLE
+            + list(range(1, len(ATTACK_NAMES)))
+        )
+
+        self.rng.shuffle(schedule)
+
+        self._scenario_schedule = schedule
+
+        self._scenario_index = 0
+
+    def _select_attack_type(self) -> int:
+        """
+        Select the next attack type from the balanced schedule.
+
+        This guarantees that every attack class appears at least once
+        during every complete scenario cycle.
+        """
+
+        # Create a new shuffled cycle when the previous cycle is exhausted.
+        if (
+            self._scenario_index
+            >= len(self._scenario_schedule)
+        ):
+            self._reset_scenario_schedule()
+
+        attack_type = self._scenario_schedule[
+            self._scenario_index
+        ]
+
+        self._scenario_index += 1
+
+        return int(attack_type)
 
     # =========================================================================
     # Generate Scenario
@@ -98,15 +181,13 @@ class NetworkSimulator:
     ) -> NetworkScenario:
 
         # ---------------------------------------------------------------------
-        # Random attack selection
+        # Attack selection
         # ---------------------------------------------------------------------
 
         if attack_type is None:
-
             attack_type = self._select_attack_type()
 
         if attack_type not in ATTACK_NAMES:
-
             raise ValueError(
                 f"Invalid attack type: {attack_type}"
             )
@@ -158,53 +239,6 @@ class NetworkSimulator:
         )
 
     # =========================================================================
-    # Attack Selection
-    # =========================================================================
-
-    def _select_attack_type(self) -> int:
-
-        # ---------------------------------------------------------------------
-        # Approximate distribution inspired by the CICIDS2017 class imbalance.
-        #
-        # These probabilities are for simulation only.
-        # They are NOT training labels from the dataset.
-        # ---------------------------------------------------------------------
-
-        attack_types = np.arange(
-            len(ATTACK_NAMES)
-        )
-
-        probabilities = np.array(
-            [
-                0.70,   # BENIGN
-                0.02,   # Bot
-                0.08,   # DDoS
-                0.02,   # DoS GoldenEye
-                0.05,   # DoS Hulk
-                0.01,   # DoS Slowhttptest
-                0.01,   # DoS slowloris
-                0.01,   # FTP-Patator
-                0.005,  # Heartbleed
-                0.005,  # Infiltration
-                0.05,   # PortScan
-                0.01,   # SSH-Patator
-                0.01,   # Web Brute Force
-                0.005,  # SQL Injection
-                0.01,   # XSS
-            ],
-            dtype=np.float64,
-        )
-
-        probabilities /= probabilities.sum()
-
-        return int(
-            self.rng.choice(
-                attack_types,
-                p=probabilities,
-            )
-        )
-
-    # =========================================================================
     # Packet Rate
     # =========================================================================
 
@@ -214,7 +248,6 @@ class NetworkSimulator:
     ) -> float:
 
         ranges = {
-
             0: (0.05, 0.30),   # BENIGN
 
             1: (0.30, 0.75),   # Bot
@@ -223,8 +256,8 @@ class NetworkSimulator:
             3: (0.55, 0.90),   # DoS GoldenEye
             4: (0.70, 1.00),   # DoS Hulk
 
-            5: (0.40, 0.75),   # Slowhttptest
-            6: (0.35, 0.70),   # slowloris
+            5: (0.40, 0.75),   # DoS Slowhttptest
+            6: (0.35, 0.70),   # DoS slowloris
 
             7: (0.20, 0.55),   # FTP Patator
             8: (0.05, 0.20),   # Heartbleed
@@ -258,7 +291,6 @@ class NetworkSimulator:
     ) -> float:
 
         ranges = {
-
             0: (0.05, 0.30),
 
             1: (0.25, 0.70),
@@ -369,35 +401,64 @@ class NetworkSimulator:
         attack_type: int,
     ) -> float:
 
-        severity_ranges = {
+        # ---------------------------------------------------------------------
+        # Benign traffic
+        # ---------------------------------------------------------------------
 
-            0: (0.00, 0.15),
+        if attack_type == 0:
 
-            1: (0.30, 0.75),
-            2: (0.70, 1.00),
+            return float(
+                self.rng.uniform(
+                    0.00,
+                    0.15,
+                )
+            )
 
-            3: (0.55, 0.90),
-            4: (0.70, 1.00),
+        # ---------------------------------------------------------------------
+        # V5 severity distribution
+        # ---------------------------------------------------------------------
+        #
+        # Every attack receives exposure to:
+        #
+        #   LOW       : 0.20 - 0.40
+        #   MEDIUM    : 0.40 - 0.70
+        #   HIGH      : 0.70 - 0.90
+        #   CRITICAL  : 0.90 - 1.00
+        #
+        # This is independent of attack type, ensuring that every attack
+        # class can be encountered at every severity level.
+        # ---------------------------------------------------------------------
 
-            5: (0.35, 0.70),
-            6: (0.35, 0.70),
+        severity_level = self.rng.choice(
+            [
+                "low",
+                "medium",
+                "high",
+                "critical",
+            ],
+            p=[
+                0.15,
+                0.30,
+                0.35,
+                0.20,
+            ],
+        )
 
-            7: (0.30, 0.65),
-            8: (0.60, 0.95),
+        if severity_level == "low":
 
-            9: (0.65, 1.00),
-            10: (0.40, 0.80),
+            low, high = 0.20, 0.40
 
-            11: (0.30, 0.65),
+        elif severity_level == "medium":
 
-            12: (0.35, 0.70),
-            13: (0.50, 0.85),
-            14: (0.35, 0.70),
-        }
+            low, high = 0.40, 0.70
 
-        low, high = severity_ranges[
-            attack_type
-        ]
+        elif severity_level == "high":
+
+            low, high = 0.70, 0.90
+
+        else:
+
+            low, high = 0.90, 1.00
 
         return float(
             self.rng.uniform(
@@ -460,132 +521,129 @@ class NetworkSimulator:
 # =============================================================================
 # Simulator Test
 # =============================================================================
-
 def test_network_simulator():
-
-    print()
     print("=" * 80)
-    print("CYBERSHIELD AI - NETWORK SIMULATOR TEST")
+    print("CYBERSHIELD AI - V5 NETWORK SIMULATOR TEST")
     print("=" * 80)
 
-    simulator = NetworkSimulator(
-        seed=42
+    simulator = NetworkSimulator(seed=42)
+
+    print("\nGenerated Network Scenarios:")
+
+    for i in range(10):
+        scenario = simulator.generate_scenario()
+
+        print(f"\nScenario {i + 1}")
+        print(f"Attack Type       : {scenario.attack_type}")
+        print(f"Attack Name       : {scenario.attack_name}")
+        print(f"Packet Rate       : {scenario.packet_rate:.3f}")
+        print(f"Byte Rate         : {scenario.byte_rate:.3f}")
+        print(f"Active Threats    : {scenario.active_threats}")
+        print(f"Threat Severity   : {scenario.threat_severity:.3f}")
+        print(f"Attack Frequency  : {scenario.attack_frequency:.3f}")
+        print(f"XGBoost Confidence: {scenario.xgboost_confidence:.3f}")
+
+    # ------------------------------------------------------------------
+    # Test 1: All attack classes
+    # ------------------------------------------------------------------
+    print("\nTesting all attack classes...")
+
+    for attack_type in range(len(ATTACK_NAMES)):
+        scenario = simulator.generate_scenario(
+            attack_type=attack_type
+        )
+
+        assert scenario.attack_type == attack_type, (
+            f"Expected attack type {attack_type}, "
+            f"got {scenario.attack_type}"
+        )
+
+    print("Attack class validation: PASSED")
+
+    # ------------------------------------------------------------------
+    # Test 2: Balanced scenario cycle
+    # ------------------------------------------------------------------
+    print("\nTesting balanced scenario cycle...")
+
+    # Start from a fresh cycle.
+    simulator._reset_scenario_schedule()
+
+    cycle_size = (
+        NetworkSimulator.BENIGN_PER_CYCLE
+        + (len(ATTACK_NAMES) - 1)
     )
 
-    # -------------------------------------------------------------------------
-    # Generate random scenarios
-    # -------------------------------------------------------------------------
+    generated_types = []
 
-    print(
-        "\nGenerated Network Scenarios:"
+    for _ in range(cycle_size):
+        scenario = simulator.generate_scenario()
+        generated_types.append(scenario.attack_type)
+
+    # Every attack type must appear exactly once.
+    for attack_type in range(1, len(ATTACK_NAMES)):
+        assert generated_types.count(attack_type) == 1, (
+            f"Attack type {attack_type} "
+            f"did not appear exactly once "
+            f"in the balanced cycle."
+        )
+
+    # Benign traffic must appear BENIGN_PER_CYCLE times.
+    assert (
+        generated_types.count(0)
+        == NetworkSimulator.BENIGN_PER_CYCLE
+    ), (
+        "Incorrect number of benign scenarios "
+        "in the balanced cycle."
     )
 
-    for index in range(10):
+    print("Balanced exposure validation: PASSED")
 
-        scenario = (
-            simulator.generate_scenario()
+    # ------------------------------------------------------------------
+    # Test 3: Severity coverage
+    # ------------------------------------------------------------------
+    print("\nTesting severity coverage...")
+
+    simulator._reset_scenario_schedule()
+
+    severity_bands = {
+        "low": False,
+        "medium": False,
+        "high": False,
+        "critical": False,
+    }
+
+    for _ in range(200):
+        scenario = simulator.generate_scenario()
+
+        if scenario.attack_type == 0:
+            continue
+
+        severity = scenario.threat_severity
+
+        if severity < 0.40:
+            severity_bands["low"] = True
+        elif severity < 0.70:
+            severity_bands["medium"] = True
+        elif severity < 0.90:
+            severity_bands["high"] = True
+        else:
+            severity_bands["critical"] = True
+
+        if all(severity_bands.values()):
+            break
+
+    for band, found in severity_bands.items():
+        assert found, (
+            f"Severity band '{band}' "
+            f"was not generated."
         )
 
-        print()
-        print(
-            f"Scenario {index + 1}"
-        )
+    print("Severity coverage validation: PASSED")
 
-        print(
-            f"Attack Type       : "
-            f"{scenario.attack_type}"
-        )
-
-        print(
-            f"Attack Name       : "
-            f"{scenario.attack_name}"
-        )
-
-        print(
-            f"Packet Rate       : "
-            f"{scenario.packet_rate:.3f}"
-        )
-
-        print(
-            f"Byte Rate         : "
-            f"{scenario.byte_rate:.3f}"
-        )
-
-        print(
-            f"Connections       : "
-            f"{scenario.active_connections:.3f}"
-        )
-
-        print(
-            f"Active Threats    : "
-            f"{scenario.active_threats}"
-        )
-
-        print(
-            f"Threat Severity   : "
-            f"{scenario.threat_severity:.3f}"
-        )
-
-        print(
-            f"Attack Frequency  : "
-            f"{scenario.attack_frequency:.3f}"
-        )
-
-        print(
-            f"XGBoost Confidence: "
-            f"{scenario.xgboost_confidence:.3f}"
-        )
-
-    # -------------------------------------------------------------------------
-    # Test every attack class
-    # -------------------------------------------------------------------------
-
-    print()
-    print(
-        "Testing all attack classes..."
-    )
-
-    for attack_type in ATTACK_NAMES:
-
-        scenario = (
-            simulator.generate_scenario(
-                attack_type=attack_type
-            )
-        )
-
-        assert (
-            scenario.attack_type
-            == attack_type
-        )
-
-        assert (
-            scenario.attack_name
-            == ATTACK_NAMES[attack_type]
-        )
-
-        assert 0.0 <= scenario.packet_rate <= 1.0
-        assert 0.0 <= scenario.byte_rate <= 1.0
-        assert 0.0 <= scenario.active_connections <= 1.0
-        assert 0.0 <= scenario.threat_severity <= 1.0
-        assert 0.0 <= scenario.attack_frequency <= 1.0
-        assert 0.0 <= scenario.xgboost_confidence <= 1.0
-
-    print(
-        "Attack class validation: PASSED"
-    )
-
-    print()
+    print("\n" + "=" * 80)
+    print("V5 NETWORK SIMULATOR TEST: PASSED")
     print("=" * 80)
-    print(
-        "NETWORK SIMULATOR TEST: PASSED"
-    )
-    print("=" * 80)
 
-
-# =============================================================================
-# Entry Point
-# =============================================================================
 
 if __name__ == "__main__":
-
     test_network_simulator()

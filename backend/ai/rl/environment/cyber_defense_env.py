@@ -37,6 +37,9 @@ from ai.rl.simulation.firewall_simulator import (
 from ai.rl.simulation.resource_manager import (
     ResourceManager,
 )
+from ai.rl.agent.state_encoder import (
+    CyberDefenseStateEncoder,
+)
 
 # =============================================================================
 # Logging
@@ -58,14 +61,11 @@ class CyberDefenseEnv(gym.Env):
 
     Observation:
 
-        [attack_type,
-         xgboost_confidence,
-         threat_severity,
-         packet_rate,
-         byte_rate,
-         active_threats,
-         previous_action,
-         available_resources]
+        V5 26-dimensional normalized state:
+        - 15 attack-type one-hot features
+        - 5 normalized continuous threat/network features
+        - 5 previous-action one-hot features
+        - 1 normalized resource feature
 
     Actions:
 
@@ -92,7 +92,7 @@ class CyberDefenseEnv(gym.Env):
     ) -> None:
 
         super().__init__()
-
+        self.state_encoder = CyberDefenseStateEncoder()
         self.max_steps = max_steps
         self.render_mode = render_mode
 
@@ -101,12 +101,11 @@ class CyberDefenseEnv(gym.Env):
         # ---------------------------------------------------------------------
 
         self.observation_space = spaces.Box(
-            low=0.0,
-            high=1.0,
-            shape=(8,),
-            dtype=np.float32,
-        )
-
+          low=0.0,
+          high=1.0,
+          shape=(CyberDefenseStateEncoder.STATE_SIZE,),
+          dtype=np.float32,
+         )
         self.action_space = spaces.Discrete(5)
 
         # ---------------------------------------------------------------------
@@ -154,6 +153,8 @@ class CyberDefenseEnv(gym.Env):
         self.last_traffic_reduction = 0.0
 
         self.last_legitimate_traffic_impact = 0.0
+        
+        self.last_resource_cost = 0.0
 
     # =========================================================================
     # Reset
@@ -294,6 +295,9 @@ class CyberDefenseEnv(gym.Env):
                 action
             )
         )
+        self.last_resource_cost = (
+           resource_result.resource_cost
+        )                       
 
         self.available_resources = (
             resource_result.resource_after
@@ -412,7 +416,9 @@ class CyberDefenseEnv(gym.Env):
     # =========================================================================
     # Reward
     # =========================================================================
-
+       # =========================================================================
+    # Reward
+    # =========================================================================
     def _calculate_reward(
         self,
         action: int,
@@ -420,75 +426,150 @@ class CyberDefenseEnv(gym.Env):
         resource_result,
     ) -> float:
 
+        severity = self.threat_severity
+
         # ---------------------------------------------------------------------
         # Benign traffic
         # ---------------------------------------------------------------------
 
         if self.attack_type == 0:
 
-            # Monitoring is the safest response.
+            # MONITOR is the preferred action.
             if action == 0:
+                reward = 4.0
 
-                base_reward = 5.0
-
+            # ALERT is acceptable but unnecessary.
             elif action == 1:
+                reward = 1.0
 
-                base_reward = 2.0
-
+            # RATE_LIMIT may affect legitimate traffic.
             elif action == 2:
+                reward = -4.0
 
-                base_reward = -2.0
-
+            # BLOCK causes significant disruption.
             elif action == 3:
+                reward = -10.0
 
-                base_reward = -8.0
-
+            # ISOLATE is the most aggressive action.
             else:
+                reward = -12.0
 
-                base_reward = -10.0
-
-            # Penalize impact on legitimate traffic.
-            base_reward -= (
+            # Penalize legitimate traffic disruption.
+            reward -= (
                 firewall_result.legitimate_traffic_impact
-                * 10.0
+                * 12.0
             )
-
-            return base_reward
 
         # ---------------------------------------------------------------------
         # Attack traffic
         # ---------------------------------------------------------------------
 
-        effectiveness = (
-            firewall_result.response_effectiveness
-        )
+        else:
 
-        severity = self.threat_severity
+            # -------------------------------------------------------------
+            # Low severity
+            # -------------------------------------------------------------
 
-        # Reward effective defense.
-        reward = (
-            effectiveness * 10.0
-        )
+            if severity < 0.40:
 
-        # ---------------------------------------------------------------------
-        # Penalize inappropriate actions
-        # ---------------------------------------------------------------------
+                if action == 0:          # MONITOR
+                    reward = 5.0
 
-        if severity >= 0.70:
+                elif action == 1:        # ALERT
+                    reward = 3.0
 
-            if action == 0:
+                elif action == 2:        # RATE_LIMIT
+                    reward = 1.0
 
-                reward -= 8.0
+                elif action == 3:        # BLOCK
+                    reward = -3.0
 
-            elif action == 1:
+                else:                    # ISOLATE
+                    reward = -5.0
 
-                reward -= 4.0
+            # -------------------------------------------------------------
+            # Medium severity
+            # -------------------------------------------------------------
 
-        elif severity < 0.30:
+            elif severity < 0.70:
 
-            if action in (3, 4):
+                if action == 0:          # MONITOR
+                    reward = -4.0
 
-                reward -= 4.0
+                elif action == 1:        # ALERT
+                    reward = 5.0
+
+                elif action == 2:        # RATE_LIMIT
+                    reward = 6.0
+
+                elif action == 3:        # BLOCK
+                    reward = 3.0
+
+                else:                    # ISOLATE
+                    reward = -1.0
+
+            # -------------------------------------------------------------
+            # High severity
+            # -------------------------------------------------------------
+
+            elif severity < 0.90:
+
+                if action == 0:          # MONITOR
+                    reward = -10.0
+
+                elif action == 1:        # ALERT
+                    reward = -1.0
+
+                elif action == 2:        # RATE_LIMIT
+                    reward = 7.0
+
+                elif action == 3:        # BLOCK
+                    reward = 10.0
+
+                else:                    # ISOLATE
+                    reward = 8.0
+
+            # -------------------------------------------------------------
+            # Critical severity
+            # -------------------------------------------------------------
+
+            else:
+
+                if action == 0:          # MONITOR
+                    reward = -15.0
+
+                elif action == 1:        # ALERT
+                    reward = -7.0
+
+                elif action == 2:        # RATE_LIMIT
+                    reward = 2.0
+
+                elif action == 3:        # BLOCK
+                    reward = 12.0
+
+                else:                    # ISOLATE
+                    reward = 15.0
+
+            # -------------------------------------------------------------
+            # Defense effectiveness
+            # -------------------------------------------------------------
+
+            reward += (
+                firewall_result.response_effectiveness
+                * 10.0
+            )
+
+            # Reward actual threat reduction.
+            reward += (
+                firewall_result.threat_reduction
+                * 15.0
+            )
+
+            # Reward useful traffic reduction.
+            reward += (
+                firewall_result.traffic_reduction
+                * 5.0
+            )
 
         # ---------------------------------------------------------------------
         # Resource cost
@@ -496,7 +577,7 @@ class CyberDefenseEnv(gym.Env):
 
         reward -= (
             resource_result.resource_cost
-            * 5.0
+            * 3.0
         )
 
         # ---------------------------------------------------------------------
@@ -504,11 +585,9 @@ class CyberDefenseEnv(gym.Env):
         # ---------------------------------------------------------------------
 
         if firewall_result.successful:
-
-            reward += 3.0
+            reward += 5.0
 
         return float(reward)
-
     # =========================================================================
     # Apply Firewall Effect
     # =========================================================================
@@ -624,25 +703,22 @@ class CyberDefenseEnv(gym.Env):
     # =========================================================================
     # Observation
     # =========================================================================
+    def _get_observation(self) -> np.ndarray:
+        """
+        Encode the current environment state using the V5
+        categorical + normalized state representation.
+        """
 
-    def _get_observation(self):
-
-        observation = np.array(
-            [
-                self.attack_type / 14.0,
-                self.xgboost_confidence,
-                self.threat_severity,
-                self.packet_rate,
-                self.byte_rate,
-                min(
-                    self.active_threats / 10.0,
-                    1.0,
-                ),
-                self.previous_action / 4.0,
-                self.available_resources,
-            ],
-            dtype=np.float32,
-        )
+        observation = self.state_encoder.encode(
+        attack_type=self.attack_type,
+        xgboost_confidence=self.xgboost_confidence,
+        threat_severity=self.threat_severity,
+        packet_rate=self.packet_rate,
+        byte_rate=self.byte_rate,
+        active_threats=self.active_threats,
+        previous_action=self.previous_action,
+        available_resources=self.available_resources,
+       )
 
         return observation
 
@@ -713,6 +789,15 @@ class CyberDefenseEnv(gym.Env):
 
             "legitimate_traffic_impact": (
                 self.last_legitimate_traffic_impact
+            ),
+            
+                        "resource_cost": self.last_resource_cost,
+
+            "threat_present": self.attack_type != 0,
+
+            "successful_response": (
+                self.attack_type != 0
+                and self.last_response_effectiveness >= 0.50
             ),
 
             "reward": self.last_reward,
@@ -830,7 +915,7 @@ def test_environment():
         f"{env.action_space}"
     )
 
-    assert env.observation_space.shape == (8,)
+    assert env.observation_space.shape == (26,)
 
     assert env.action_space.n == 5
 
@@ -862,7 +947,7 @@ def test_environment():
         info["attack_name"]
     )
 
-    assert observation.shape == (8,)
+    assert observation.shape == (26,)
 
     assert observation.dtype == np.float32
 
@@ -920,7 +1005,7 @@ def test_environment():
             f"{info['available_resources']:.3f}"
         )
 
-        assert observation.shape == (8,)
+        assert observation.shape == (26,)
 
         assert isinstance(
             reward,

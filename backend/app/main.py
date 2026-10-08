@@ -5,6 +5,7 @@ from app.routes import dashboard
 from app.routes import threats
 from app.routes import xgboost
 from app.routes import blockchain
+from app.routes import defense
 
 app = FastAPI(
     title="CyberShield AI API",
@@ -46,3 +47,4 @@ app.include_router(dashboard.router)
 app.include_router(threats.router)
 app.include_router(xgboost.router)
 app.include_router(blockchain.router)
+app.include_router(defense.router)

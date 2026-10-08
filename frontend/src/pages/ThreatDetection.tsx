@@ -90,7 +90,7 @@ export default function ThreatDetection() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/xgboost/predict`,
+        `${API_URL}/api/defense/analyze`,
         {
           method: "POST",
           headers: {
@@ -262,77 +262,118 @@ export default function ThreatDetection() {
         </div>
       )}
 
-      {/* Prediction Result */}
-      {result && (
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
+      {/* Defense Result */}
+{result && (
+  <div className="rounded-xl border bg-white p-6 shadow-sm">
 
-          <h2 className="text-xl font-bold text-black">
-            XGBoost Prediction Result
-          </h2>
+    <h2 className="text-xl font-bold text-black">
+      CyberShield AI Defense Result
+    </h2>
 
-          <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+    {/* XGBoost + PPO Results */}
+    <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
 
-            {/* Attack */}
-            <div className="rounded-lg bg-slate-100 p-5">
-              <p className="text-sm text-gray-500">
-                Detected Attack
-              </p>
+      {/* Attack */}
+      <div className="rounded-lg bg-slate-100 p-5">
+        <p className="text-sm text-gray-500">
+          Detected Attack
+        </p>
 
-              <p className="mt-2 text-2xl font-bold text-black">
-                {result.attack_name}
-              </p>
-            </div>
+        <p className="mt-2 text-2xl font-bold text-black">
+          {result.xgboost.attack_name}
+        </p>
+      </div>
 
-            {/* Confidence */}
-            <div className="rounded-lg bg-slate-100 p-5">
-              <p className="text-sm text-gray-500">
-                Confidence
-              </p>
+      {/* Confidence */}
+      <div className="rounded-lg bg-slate-100 p-5">
+        <p className="text-sm text-gray-500">
+          XGBoost Confidence
+        </p>
 
-              <p className="mt-2 text-2xl font-bold text-black">
-                {(result.confidence * 100).toFixed(2)}%
-              </p>
-            </div>
+        <p className="mt-2 text-2xl font-bold text-black">
+          {(result.xgboost.confidence * 100).toFixed(2)}%
+        </p>
+      </div>
 
-            {/* Severity */}
-            <div className="rounded-lg bg-slate-100 p-5">
-              <p className="text-sm text-gray-500">
-                Severity
-              </p>
+      {/* PPO Action */}
+      <div className="rounded-lg bg-slate-100 p-5">
+        <p className="text-sm text-gray-500">
+          PPO Defense Action
+        </p>
 
-              <p className="mt-2 text-2xl font-bold text-black">
-                {result.severity}
-              </p>
-            </div>
+        <p className="mt-2 text-2xl font-bold text-black">
+          {result.ppo.action_name}
+        </p>
+      </div>
 
-            {/* Status */}
-            <div className="rounded-lg bg-slate-100 p-5">
-              <p className="text-sm text-gray-500">
-                Status
-              </p>
+      {/* Blockchain */}
+      <div className="rounded-lg bg-slate-100 p-5">
+        <p className="text-sm text-gray-500">
+          Blockchain Block
+        </p>
 
-              <p className="mt-2 text-2xl font-bold text-black">
-                {result.status}
-              </p>
-            </div>
+        <p className="mt-2 text-2xl font-bold text-black">
+          #{result.blockchain.block_index}
+        </p>
+      </div>
 
-          </div>
+    </div>
 
-          {/* Source */}
-          <div className="mt-6 rounded-lg border p-4">
+    {/* Threat Information */}
+    <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
 
-            <p className="text-sm text-gray-500">
-              Source IP
-            </p>
+      {/* Severity */}
+      <div className="rounded-lg border p-4">
+        <p className="text-sm text-gray-500">
+          Threat Severity
+        </p>
 
-            <p className="mt-1 font-mono text-black">
-              {result.source_ip}
-            </p>
+        <p className="mt-1 text-lg font-bold text-black">
+          {result.network_context.threat_severity.toFixed(3)}
+        </p>
+      </div>
 
-          </div>
+      {/* Active Threats */}
+      <div className="rounded-lg border p-4">
+        <p className="text-sm text-gray-500">
+          Active Threats
+        </p>
 
-        </div>
-      )}
+        <p className="mt-1 text-lg font-bold text-black">
+          {result.network_context.active_threats}
+        </p>
+      </div>
+
+    </div>
+
+    {/* Source IP */}
+    <div className="mt-6 rounded-lg border p-4">
+
+      <p className="text-sm text-gray-500">
+        Source IP
+      </p>
+
+      <p className="mt-1 font-mono text-black">
+        {sourceIp}
+      </p>
+
+    </div>
+
+    {/* Blockchain Hash */}
+    <div className="mt-6 rounded-lg border p-4">
+
+      <p className="text-sm text-gray-500">
+        Blockchain Transaction Hash
+      </p>
+
+      <p className="mt-2 break-all font-mono text-sm text-black">
+        {result.blockchain.block_hash}
+      </p>
+
+    </div>
+
+  </div>
+)}
 
     </div>
   );

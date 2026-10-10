@@ -1,7 +1,8 @@
+
 """
 CyberShield AI - Private Blockchain
 
-Manages the blockchain and provides:
+Manages blockchain operations:
 - Genesis block creation
 - Security event recording
 - Chain validation
@@ -21,11 +22,12 @@ class Blockchain:
         self.storage_path = Path(
             storage_path
             if storage_path
-            else Path(__file__).resolve().parent / "data" / "blockchain.json"
+            else Path(__file__).resolve().parent
+            / "data"
+            / "blockchain.json"
         )
 
         self.chain = []
-
         self._load_chain()
 
     def _load_chain(self):
@@ -37,7 +39,9 @@ class Blockchain:
             return
 
         try:
-            with open(self.storage_path, "r", encoding="utf-8") as file:
+            with open(
+                self.storage_path, "r", encoding="utf-8"
+            ) as file:
                 stored_chain = json.load(file)
 
             self.chain = [
@@ -50,7 +54,7 @@ class Blockchain:
 
         except (json.JSONDecodeError, OSError, ValueError, KeyError) as error:
             raise RuntimeError(
-            f"Blockchain integrity check failed: {error}"
+                f"Blockchain integrity check failed: {error}"
             ) from error
 
     def _block_from_dict(self, block_data):
@@ -59,7 +63,7 @@ class Blockchain:
         block = Block(
             index=block_data["index"],
             event=block_data["event"],
-            previous_hash=block_data["previous_hash"]
+            previous_hash=block_data["previous_hash"],
         )
 
         # Preserve the original stored values.
@@ -73,19 +77,16 @@ class Blockchain:
 
         self.storage_path.parent.mkdir(
             parents=True,
-            exist_ok=True
+            exist_ok=True,
         )
 
         with open(
-            self.storage_path,
-            "w",
-            encoding="utf-8"
+            self.storage_path, "w", encoding="utf-8"
         ) as file:
-
             json.dump(
-                self.get_chain(),
+                [block.to_dict() for block in self.chain],
                 file,
-                indent=4
+                indent=4,
             )
 
     def create_genesis_block(self):
@@ -93,13 +94,13 @@ class Blockchain:
 
         genesis_event = {
             "event": "Genesis Block",
-            "description": "CyberShield AI Blockchain Initialized"
+            "description": "CyberShield AI Blockchain Initialized",
         }
 
         genesis_block = Block(
             index=0,
             event=genesis_event,
-            previous_hash="0"
+            previous_hash="0",
         )
 
         self.chain.append(genesis_block)
@@ -113,20 +114,21 @@ class Blockchain:
         """Add a SecurityEvent to the blockchain."""
 
         if not isinstance(event, SecurityEvent):
-            raise TypeError(
-                "event must be a SecurityEvent object"
-            )
+            raise TypeError("event must be a SecurityEvent object")
+
+        # Refresh persisted state before appending a new event.
+        if self.storage_path.exists():
+            self._load_chain()
 
         latest_block = self.get_latest_block()
 
         new_block = Block(
             index=len(self.chain),
             event=event.to_dict(),
-            previous_hash=latest_block.hash
+            previous_hash=latest_block.hash,
         )
 
         self.chain.append(new_block)
-
         self._save_chain()
 
         return new_block
@@ -151,7 +153,6 @@ class Blockchain:
 
         # Validate remaining blocks.
         for i in range(1, len(self.chain)):
-
             current_block = self.chain[i]
             previous_block = self.chain[i - 1]
 
@@ -167,7 +168,10 @@ class Blockchain:
         return True
 
     def get_chain(self) -> list:
-        """Return the complete blockchain."""
+        """Return the latest persisted blockchain."""
+
+        if self.storage_path.exists():
+            self._load_chain()
 
         return [
             block.to_dict()

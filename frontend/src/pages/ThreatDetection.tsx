@@ -45,38 +45,67 @@ const SELECTED_FEATURES = [
   "ACK Flag Count",
 ];
 
+interface DefenseResult {
+  xgboost: {
+    predicted_class: number;
+    attack_name: string;
+    confidence: number;
+  };
+  ppo: {
+    state_shape: number[];
+    action: number;
+    action_name: string;
+  };
+  blockchain: {
+    block_index: number;
+    block_hash: string;
+    previous_hash: string;
+  };
+  defense_execution: {
+    mode: string;
+    action: string;
+    successful: boolean;
+    message: string;
+    threat_reduction: number;
+    traffic_reduction: number;
+    legitimate_traffic_impact: number;
+    resource_cost: number;
+    response_effectiveness: number;
+  };
+  network_context: {
+    packet_rate: number;
+    byte_rate: number;
+    active_threats: number;
+    threat_severity: number;
+  };
+}
+
 export default function ThreatDetection() {
   const [features, setFeatures] = useState<number[]>([]);
   const [sourceIp, setSourceIp] = useState("192.168.1.100");
 
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<DefenseResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // Load a test packet
+  // Load a synthetic DoS attack test packet
   const loadTestData = () => {
-    const testData = new Array(40).fill(0);
-
-    // Example benign network traffic
-    testData[0] = 80;      // Destination Port
-    testData[4] = 100000;  // Flow Duration
-    testData[5] = 1000;    // Fwd Packet Length Max
-    testData[6] = 1000;    // Bwd Packet Length Max
-    testData[17] = 10;     // Total Fwd Packets
-    testData[18] = 100;    // Packet Length Variance
-    testData[19] = 64240;  // Init Win Forward
-    testData[20] = 1000;   // Fwd IAT Std
-    testData[21] = 1000;   // Flow IAT Min
-    testData[29] = 10000;  // Bwd IAT Total
-    testData[30] = 0;      // PSH Flag Count
-    testData[38] = 1000;   // Bwd IAT Min
-    testData[39] = 10;     // ACK Flag Count
+    const testData = [
+      80, 0, 20, 5000, 100000,
+      1500, 1500, 5000, 1200, 100000,
+      5000, 20, 5000, 5000, 1500,
+      10000, 100, 500, 500000, 64240,
+      5000, 1, 90, 1, 100,
+      1500, 100, 500, 100, 100,
+      100, 100, 500, 100, 5000,
+      100, 1500, 100, 100, 20,
+    ];
 
     setFeatures(testData);
-    setSourceIp("192.168.1.100");
+    setSourceIp("192.0.2.20");
     setResult(null);
     setError("");
   };
+
 
   const predictThreat = async () => {
     if (features.length !== 40) {
@@ -114,8 +143,12 @@ export default function ThreatDetection() {
       }
 
       setResult(data);
-    } catch (err: any) {
-      setError(err.message || "Unable to connect to backend");
+    } catch (err: unknown) {
+      setError(
+  err instanceof Error
+    ? err.message
+    : "Unable to connect to backend"
+);
     } finally {
       setLoading(false);
     }

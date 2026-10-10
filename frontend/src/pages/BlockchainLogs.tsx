@@ -71,19 +71,22 @@ export default function BlockchainLogs() {
           ? verifyData
           : verifyData.valid ?? verifyData.integrity ?? false
       );
-    } catch (err: any) {
-      setError(
-        err.message || "Unable to connect to the blockchain backend"
-      );
-    } finally {
+   } catch (err: unknown) {
+  setError(
+    err instanceof Error
+      ? err.message
+      : "Unable to connect to the blockchain backend"
+  );
+} finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadBlockchainData();
-  }, []);
-
+  // Initial data fetch synchronizes this page with the backend.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  void loadBlockchainData();
+}, []);
   const formatTimestamp = (timestamp?: string) => {
     if (!timestamp) return "-";
 

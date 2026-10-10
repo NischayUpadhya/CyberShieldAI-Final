@@ -11,8 +11,8 @@ Provides API endpoints for:
 from fastapi import APIRouter
 
 from app.models.blockchain import BlockchainEventRequest
-from backend.blockchain.event import SecurityEvent
-from backend.blockchain.service import BlockchainService
+from blockchain.event import SecurityEvent
+from blockchain.service import BlockchainService
 
 
 router = APIRouter(

@@ -17,14 +17,16 @@ export default function AttackTrendChart() {
         Attack Trend
       </h2>
 
-      <div
-        className="w-full"
-        style={{ height: "320px" }}
-      >
-        <ResponsiveContainer
-          width="100%"
-          height="100%"
-        >
+     <div
+  className="w-full min-w-0"
+  style={{ height: 320, minHeight: 320 }}
+>
+  <ResponsiveContainer
+    width="100%"
+    height="100%"
+    initialDimension={{ width: 500, height: 320 }}
+    debounce={100}
+  >
           <LineChart
             data={attackTrendData}
             margin={{

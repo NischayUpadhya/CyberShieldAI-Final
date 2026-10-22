@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from app.routes import live_monitor
 from app.routes import dashboard
 from app.routes import threats
 from app.routes import xgboost
@@ -19,9 +19,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
+
+        allow_origins=[
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -48,3 +52,4 @@ app.include_router(threats.router)
 app.include_router(xgboost.router)
 app.include_router(blockchain.router)
 app.include_router(defense.router)
+app.include_router(live_monitor.router)

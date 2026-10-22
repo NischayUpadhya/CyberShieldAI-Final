@@ -30,3 +30,14 @@ ai/saved_models/
 # Logs
 # ==========================
 *.log
+# CyberShield AI - temporary live monitoring backups
+backend/backup_before_live_ai_patch/
+backend/app/services/*_backup.py
+backend/app/services/*_before_final_fix.py
+backend/app/services/*_pre_feature_update.py
+backend/app/services/*.bak
+
+# Local test and generated artifacts
+test_capture.py
+openapi.json
+xgboost_scripts.txt

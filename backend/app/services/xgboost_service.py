@@ -7,6 +7,7 @@ prediction functionality for the backend API.
 
 from pathlib import Path
 
+
 import joblib
 import numpy as np
 

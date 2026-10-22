@@ -8,19 +8,49 @@ const API_BASE = (
 const POLL_INTERVAL = 2500;
 const firstObservedAt = new Map<string, number>();
 
-function getFlows(payload) {
+interface LiveFlow {
+  id: string;
+  time: string;
+  source: string;
+  destination: string;
+  protocol: string;
+  predictedClass: string;
+  confidence: number | null;
+  isBenign: boolean;
+  isPending: boolean;
+  pendingReason: string;
+}
+
+interface MetricCardProps {
+  title: string;
+  value: string | number;
+  description: string;
+  color?: string;
+}
+
+interface LiveMonitorPayload {
+  capture_mode?: string;
+  defense_execution?: string;
+  defense_enabled?: boolean;
+  automatic_defense_enabled?: boolean;
+  flows?: any[];
+  [key: string]: any;
+}
+
+function getFlows(payload: unknown): any[] {
   if (Array.isArray(payload)) return payload;
 
   if (!payload || typeof payload !== "object") return [];
 
+  const record = payload as Record<string, unknown>;
   for (const key of ["flows", "items", "results", "data"]) {
-    if (Array.isArray(payload[key])) return payload[key];
+    if (Array.isArray(record[key])) return record[key] as any[];
   }
 
   return [];
 }
 
-function getValue(object, keys, fallback = null) {
+function getValue(object: any, keys: string[], fallback: any = null): any {
   for (const key of keys) {
     const value = object?.[key];
 
@@ -32,18 +62,19 @@ function getValue(object, keys, fallback = null) {
   return fallback;
 }
 
-function formatTime(value) {
+function formatTime(value: unknown): string {
   if (!value) return "—";
 
   const date =
     typeof value === "number"
       ? new Date(value > 1e12 ? value : value * 1000)
-      : new Date(value);
+      : new Date(String(value));
 
   return Number.isNaN(date.getTime())
     ? String(value)
     : date.toLocaleTimeString();
 }
+
 
 
 
@@ -102,7 +133,7 @@ function explainPendingReason(flow: any): string {
   );
 }
 
-function normalizeFlow(flow, index) {
+function normalizeFlow(flow: any): LiveFlow {
   const prediction =
     flow?.prediction && typeof flow.prediction === "object"
       ? flow.prediction
@@ -213,7 +244,7 @@ function normalizeFlow(flow, index) {
   };
 }
 
-function MetricCard({ title, value, description, color = "text-gray-500" }) {
+function MetricCard({ title, value, description, color = "text-gray-500" }: MetricCardProps) {
   return (
     <div className="rounded-xl border bg-white p-6 shadow-sm">
       <p className="text-sm font-medium text-gray-500">{title}</p>
@@ -224,15 +255,15 @@ function MetricCard({ title, value, description, color = "text-gray-500" }) {
 }
 
 export default function LiveMonitoring() {
-  const [payload, setPayload] = useState(null);
-  const [flows, setFlows] = useState([]);
+  const [payload, setPayload] = useState<LiveMonitorPayload | null>(null);
+  const [flows, setFlows] = useState<LiveFlow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    let timer;
+    let timer: number | undefined;
 
     async function fetchFlows() {
       try {
@@ -300,11 +331,6 @@ export default function LiveMonitoring() {
     ["capture_mode"],
     "Not reported"
   );
-
-  const defenseDisabled =
-    payload?.defense_execution === "disabled" ||
-    payload?.defense_enabled === false ||
-    payload?.automatic_defense_enabled === false;
 
   return (
     <div className="space-y-6">

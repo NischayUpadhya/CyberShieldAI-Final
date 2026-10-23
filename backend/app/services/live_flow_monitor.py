@@ -7,17 +7,135 @@ XGBoost only when the validated 40-feature vector is complete.
 Safety: this module does not block packets or execute automated defense.
 """
 
-from threading import Lock, Thread
+import os
+from pathlib import Path
+from threading import Lock
 from time import time
 from collections import deque
 
-from scapy.all import IP, TCP, UDP, sniff
+from scapy.all import IP, TCP, UDP, IFACES, AsyncSniffer
 
 from .live_feature_extractor import extract_live_features
 from .xgboost_service import xgboost_service
 
+VIRTUAL_KEYWORDS = [
+    "virtual", "vmware", "virtualbox", "hyper-v", "vethernet",
+    "wan miniport", "loopback", "bluetooth", "wi-fi direct", "wifi direct", "teredo"
+]
 
-WIFI_INTERFACE = r"\Device\NPF_{FFA90319-D30D-4021-B985-FA40FFE03DED}"
+WIFI_KEYWORDS = ["wi-fi", "wifi", "wireless", "802.11", "wlan"]
+
+
+def _load_env_file():
+    """Load CYBERSHIELD_INTERFACE from the project‑root .env file.
+    This function loads **only** the `CYBERSHIELD_INTERFACE` key and reports any I/O errors to stderr.
+    """
+    # Look only at the project‑root .env file (three levels up from this file)
+    base = Path(__file__).resolve().parents[3]
+    candidate = base / ".env"
+    if candidate.exists():
+        try:
+            with open(candidate, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k, v = k.strip(), v.strip().strip('"').strip("'")
+                    if k == "CYBERSHIELD_INTERFACE" and k not in os.environ:
+                        os.environ[k] = v
+        except Exception as e:
+            import sys
+            sys.stderr.write(f"[live_flow_monitor] Failed to read .env file: {e}\n")
+
+
+def is_virtual_or_loopback(name: str, desc: str) -> bool:
+    target = f"{name} {desc}".lower()
+    return any(keyword in target for keyword in VIRTUAL_KEYWORDS)
+
+
+def is_wifi_adapter(name: str, desc: str) -> bool:
+    target = f"{name} {desc}".lower()
+    return any(keyword in target for keyword in WIFI_KEYWORDS)
+
+
+def get_available_interfaces() -> list[dict]:
+    result = []
+    for dev_name, iface in IFACES.items():
+        name = getattr(iface, "name", "")
+        desc = getattr(iface, "description", "")
+        guid = getattr(iface, "guid", "")
+        ip = getattr(iface, "ip", "")
+        net_name = getattr(iface, "network_name", dev_name)
+        result.append({
+            "name": name,
+            "description": desc,
+            "guid": guid,
+            "network_name": net_name,
+            "ip": ip,
+            "is_virtual": is_virtual_or_loopback(name, desc),
+            "is_wifi": is_wifi_adapter(name, desc),
+        })
+    return result
+
+
+def resolve_capture_interface(explicit_target: str | None = None) -> tuple[str, str]:
+    """Resolve the network interface for live flow capture.
+
+    Order of precedence:
+    1. explicit_target parameter (if provided)
+    2. CYBERSHIELD_INTERFACE environment variable (or from .env)
+    3. Automatic discovery of a single physical Wi‑Fi adapter via Scapy/Npcap
+    """
+    _load_env_file()
+    interfaces = get_available_interfaces()
+    if not interfaces:
+        raise RuntimeError("No network interfaces found by Scapy/Npcap. Verify that Npcap is installed and running.")
+
+    target = explicit_target or os.environ.get("CYBERSHIELD_INTERFACE", "").strip()
+    if target:
+        cleaned_target = target.lower()
+        matched = []
+        for iface in interfaces:
+            net_name = iface["network_name"].lower()
+            name = iface["name"].lower()
+            guid = iface["guid"].lower()
+            desc = iface["description"].lower()
+            if cleaned_target in (net_name, name, guid, guid.strip("{}")):
+                matched.append(iface)
+        if not matched:
+            avail = "\n".join(f"  - Name: {i['name']} | Desc: {i['description']} | Device: {i['network_name']}" for i in interfaces)
+            raise ValueError(f"Configured interface '{target}' was not found among available interfaces.\nAvailable interfaces:\n{avail}")
+        if len(matched) > 1:
+            exact = [m for m in matched if cleaned_target in (m["network_name"].lower(), m["name"].lower(), m["guid"].lower())]
+            if len(exact) == 1:
+                selected = exact[0]
+            else:
+                summary = "\n".join(f"  - {m['name']} ({m['description']}): {m['network_name']}" for m in matched)
+                raise ValueError(f"Configured interface '{target}' is ambiguous, matched multiple interfaces:\n{summary}")
+        else:
+            selected = matched[0]
+        return selected["network_name"], selected["name"] or selected["description"] or "Wi‑Fi"
+
+    # Automatic discovery
+    wifi_candidates = [i for i in interfaces if i["is_wifi"] and not i["is_virtual"]]
+    if len(wifi_candidates) == 1:
+        sel = wifi_candidates[0]
+        return sel["network_name"], sel["name"] or "Wi‑Fi"
+    if len(wifi_candidates) > 1:
+        active = [i for i in wifi_candidates if i["ip"] and not i["ip"].startswith("169.254.") and i["ip"] != "0.0.0.0"]
+        if len(active) == 1:
+            sel = active[0]
+            return sel["network_name"], sel["name"] or "Wi-Fi"
+        candidates_str = "\n".join(f"  - {c['name']} ({c['description']}) [IP: {c['ip']}]: {c['network_name']}" for c in wifi_candidates)
+        raise RuntimeError(
+            "Multiple Wi-Fi interfaces detected. Please set the CYBERSHIELD_INTERFACE environment variable to specify which one to use.\nDetected Wi-Fi interfaces:\n" + candidates_str)
+    # Fallback error
+    avail = "\n".join(f"  - Name: {i['name']} | Desc: {i['description']} [IP: {i['ip']}]" for i in interfaces if not i["is_virtual"])
+    raise RuntimeError(
+        "No physical Wi-Fi interface automatically detected. If using Ethernet or another adapter, set the CYBERSHIELD_INTERFACE environment variable with the adapter name or GUID.\n" +
+        f"Available non-virtual interfaces:\n{avail}")
+
 MAX_FLOWS = 2000
 IDLE_TIMEOUT_SECONDS = 60.0
 ACTIVE_TIMEOUT_SECONDS = 5.0
@@ -30,9 +148,23 @@ class LiveFlowMonitor:
         self._lock = Lock()
         self._flows = {}
         self._running = False
-        self._thread = None
         self._started_at = None
         self._last_error = None
+        self._active_interface_device = None
+        self._active_interface_name = "Wi-Fi"
+        # Legacy thread placeholder (kept for backward compatibility)
+        self._thread = None
+        # AsyncSniffer instance when capture is active
+        self._sniffer = None
+
+    def _sniffer_active(self) -> bool:
+        """Return True if the AsyncSniffer is running or its thread is alive."""
+        if not self._sniffer:
+            return False
+        if getattr(self._sniffer, "running", False):
+            return True
+        thread = getattr(self._sniffer, "_thread", None)
+        return bool(thread and thread.is_alive())
 
     @staticmethod
     def _packet_details(packet):
@@ -49,7 +181,6 @@ class LiveFlowMonitor:
             protocol = "OTHER"
             src_port = 0
             dst_port = 0
-
         source = (ip.src, src_port)
         destination = (ip.dst, dst_port)
         endpoints = tuple(sorted((source, destination)))
@@ -97,18 +228,15 @@ class LiveFlowMonitor:
     def _handle_packet(self, packet):
         if IP not in packet:
             return
-
         now = time()
         key, source, destination, protocol = self._packet_details(packet)
         ip = packet[IP]
         packet_length = int(ip.len or len(ip))
         ip_header_length = int(ip.ihl or 5) * 4
-
         tcp_header_length = 0
         tcp_flags = 0
         tcp_window = None
         payload_length = 0
-
         if TCP in packet:
             tcp = packet[TCP]
             tcp_header_length = int(tcp.dataofs or 5) * 4
@@ -117,19 +245,20 @@ class LiveFlowMonitor:
             payload_length = len(bytes(tcp.payload))
         elif UDP in packet:
             payload_length = len(bytes(packet[UDP].payload))
-
         with self._lock:
             if key not in self._flows:
                 if len(self._flows) >= MAX_FLOWS:
-                    oldest = min(self._flows, key=lambda item: self._flows[item]["last_seen"])
+                    oldest = min(self._flows, key=lambda k: self._flows[k]["last_seen"])
                     del self._flows[oldest]
-                self._flows[key] = self._new_flow(source, destination, protocol, now)
-
+                if TCP in packet and (tcp_flags & 0x02) and (tcp_flags & 0x10):
+                    # Observed a TCP SYN-ACK as the first packet for this flow:
+                    # Orient flow so destination is the client/initiator (forward endpoint)
+                    # and source is the server.
+                    self._flows[key] = self._new_flow(destination, source, protocol, now)
+                else:
+                    self._flows[key] = self._new_flow(source, destination, protocol, now)
             flow = self._flows[key]
             is_forward = source == flow["forward_endpoint"]
-
-            # Initial windows are only taken from actual handshake packets.
-            # Midstream TCP window values are not substituted for initial windows.
             if TCP in packet:
                 syn = bool(tcp_flags & 0x02)
                 ack = bool(tcp_flags & 0x10)
@@ -137,17 +266,14 @@ class LiveFlowMonitor:
                     flow["forward_initial_window"] = tcp_window
                 elif syn and ack and not is_forward and flow["backward_initial_window"] is None:
                     flow["backward_initial_window"] = tcp_window
-
             flow["packets"] += 1
             flow["bytes"] += packet_length
             flow["last_seen"] = now
             flow["packet_lengths"].append(packet_length)
             flow["packet_timestamps"].append(now)
-
             if flow["last_packet_time"] is not None:
                 flow["inter_arrival_seconds"].append(max(0.0, now - flow["last_packet_time"]))
             flow["last_packet_time"] = now
-
             if is_forward:
                 flow["forward_packets"] += 1
                 flow["forward_bytes"] += packet_length
@@ -168,49 +294,105 @@ class LiveFlowMonitor:
                 if flow["last_backward_time"] is not None:
                     flow["backward_iats"].append(max(0.0, now - flow["last_backward_time"]))
                 flow["last_backward_time"] = now
-
             flow["fin_flag_count"] += int(bool(tcp_flags & 0x01))
             flow["syn_flag_count"] += int(bool(tcp_flags & 0x02))
             flow["rst_flag_count"] += int(bool(tcp_flags & 0x04))
             flow["psh_flag_count"] += int(bool(tcp_flags & 0x08))
             flow["ack_flag_count"] += int(bool(tcp_flags & 0x10))
 
-    def _capture(self):
-        try:
-            sniff(
-                iface=WIFI_INTERFACE,
-                filter="ip",
-                prn=self._handle_packet,
-                store=False,
-                stop_filter=lambda _: not self._running,
-            )
-        except Exception as error:
-            with self._lock:
-                self._last_error = f"{type(error).__name__}: {error}"
-                self._running = False
+    def _sniffer_terminated(self, sniffer) -> bool:
+        """Return True if the given sniffer is definitely not running."""
+        if not sniffer:
+            return True
+        if getattr(sniffer, "running", False):
+            return False
+        thread = getattr(sniffer, "_thread", None)
+        return not (thread and thread.is_alive())
 
-    def start(self):
+    def start(self, interface: str | None = None):
+        """Start live flow capture on the resolved interface.
+        Returns a dict indicating the start status.
+        """
+        # Pre‑check for existing capture under lock
         with self._lock:
+            if self._sniffer_active():
+                return {"status": "error", "error": "previous capture still running", "capture_mode": "passive"}
+            if self._thread and getattr(self._thread, "is_alive", lambda: False)():
+                return {"status": "error", "error": "previous legacy capture thread still running", "capture_mode": "passive"}
             if self._running:
-                return {"status": "already_running", "capture_mode": "passive"}
+                return {"status": "already_running", "interface": self._active_interface_name, "capture_mode": "passive"}
+            try:
+                device, display_name = resolve_capture_interface(interface)
+            except Exception as err:
+                self._last_error = f"{type(err).__name__}: {err}"
+                return {"status": "error", "error": str(err), "capture_mode": "passive"}
+            self._active_interface_device = device
+            self._active_interface_name = display_name
             self._running = True
             self._last_error = None
             self._started_at = time()
-
-        self._thread = Thread(target=self._capture, daemon=True)
-        self._thread.start()
-        return {"status": "started", "interface": "Wi-Fi", "capture_mode": "passive"}
+            candidate_sniffer = AsyncSniffer(iface=device, filter="ip", prn=self._handle_packet, store=False)
+            self._sniffer = candidate_sniffer
+        # Start outside the lock
+        try:
+            candidate_sniffer.start()
+        except Exception as sn_err:
+            orig_error = f"SnifferError: {type(sn_err).__name__}: {sn_err}"
+            # Attempt safe cleanup without hiding the original startup error
+            try:
+                if hasattr(candidate_sniffer, "stop"):
+                    candidate_sniffer.stop()
+                if hasattr(candidate_sniffer, "join"):
+                    candidate_sniffer.join(timeout=2)
+            except Exception as cleanup_err:
+                orig_error += f" (cleanup error: {type(cleanup_err).__name__}: {cleanup_err})"
+            with self._lock:
+                self._running = False
+                still_running = not self._sniffer_terminated(candidate_sniffer)
+                if not still_running:
+                    if self._sniffer is candidate_sniffer:
+                        self._sniffer = None
+                self._last_error = orig_error
+            return {"status": "error", "error": str(sn_err), "capture_mode": "passive"}
+        return {"status": "started", "interface": self._active_interface_name, "device": device, "capture_mode": "passive"}
 
     def stop(self):
+        """Request capture stop and clean up resources.
+        Returns a dict with status `stop_requested`.
+        """
         with self._lock:
             self._running = False
+            sniffer = self._sniffer
+            legacy_thread = self._thread
+        if sniffer:
+            try:
+                sniffer.stop()
+                sniffer.join(timeout=5)
+            except Exception as e:
+                with self._lock:
+                    self._last_error = f"SnifferStopError: {type(e).__name__}: {e}"
+            finally:
+                if self._sniffer_terminated(sniffer):
+                    with self._lock:
+                        if self._sniffer is sniffer:
+                            self._sniffer = None
+        if legacy_thread:
+            if getattr(legacy_thread, "is_alive", lambda: False)():
+                try:
+                    legacy_thread.join(timeout=5)
+                except Exception:
+                    pass
+            if not getattr(legacy_thread, "is_alive", lambda: False)():
+                with self._lock:
+                    if self._thread is legacy_thread:
+                        self._thread = None
         return {"status": "stop_requested"}
 
     def status(self):
         with self._lock:
             return {
                 "running": self._running,
-                "interface": "Wi-Fi",
+                "interface": self._active_interface_name,
                 "capture_mode": "passive",
                 "flow_count": len(self._flows),
                 "last_error": self._last_error,
@@ -236,17 +418,17 @@ class LiveFlowMonitor:
         if not values:
             return 0.0
         mean = sum(values) / len(values)
-        return (sum((value - mean) ** 2 for value in values) / len(values)) ** 0.5
+        return (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
 
     @staticmethod
     def _activity_metrics(timestamps):
         """Approximate CICFlowMeter-style active periods in seconds.
-
-        Uses a 2-second idle gap and a 5-second active-period cap. This is a
-        live approximation and should not be assumed identical to training.
+        Uses a 2‑second idle gap and a 5‑second active‑period cap.
+        When a flow has insufficient packet timestamps (< 2) to calculate an
+        interval, active metrics are 0.0, matching the CICIDS2017 training convention.
         """
         if len(timestamps) < 2:
-            return None, None
+            return 0.0, 0.0
         periods = []
         period_start = previous = timestamps[0]
         for current in list(timestamps)[1:]:
@@ -263,13 +445,9 @@ class LiveFlowMonitor:
     def get_flows(self):
         now = time()
         with self._lock:
-            expired = [
-                key for key, flow in self._flows.items()
-                if now - flow["last_seen"] > IDLE_TIMEOUT_SECONDS
-            ]
-            for key in expired:
-                del self._flows[key]
-
+            expired = [k for k, f in self._flows.items() if now - f["last_seen"] > IDLE_TIMEOUT_SECONDS]
+            for k in expired:
+                del self._flows[k]
             results = []
             for flow in self._flows.values():
                 actual_duration = max(flow["last_seen"] - flow["first_seen"], 0.0)
@@ -279,7 +457,6 @@ class LiveFlowMonitor:
                     backward_rate = flow["backward_packets"] / actual_duration
                 else:
                     packet_rate = byte_rate = backward_rate = 0.0
-
                 lengths = list(flow["packet_lengths"])
                 fwd_lengths = list(flow["forward_packet_lengths"])
                 bwd_lengths = list(flow["backward_packet_lengths"])
@@ -289,7 +466,6 @@ class LiveFlowMonitor:
                 total_packets = flow["forward_packets"] + flow["backward_packets"]
                 total_bytes = flow["forward_bytes"] + flow["backward_bytes"]
                 active_min, active_mean = self._activity_metrics(flow["packet_timestamps"])
-
                 mean_length = self._mean(lengths)
                 mean_bwd_length = self._mean(bwd_lengths)
                 mean_fwd_length = self._mean(fwd_lengths)
@@ -312,10 +488,7 @@ class LiveFlowMonitor:
                     "mean_packet_length": mean_length,
                     "min_packet_length": self._minimum(lengths),
                     "max_packet_length": self._maximum(lengths),
-                    "packet_length_variance": (
-                        sum((x - mean_length) ** 2 for x in lengths) / len(lengths)
-                        if lengths else 0.0
-                    ),
+                    "packet_length_variance": (sum((x - mean_length) ** 2 for x in lengths) / len(lengths)) if lengths else 0.0,
                     "flow_iat_mean_seconds": self._mean(iats),
                     "flow_iat_std_seconds": self._std(iats),
                     "flow_iat_min_seconds": self._minimum(iats),
@@ -342,24 +515,11 @@ class LiveFlowMonitor:
                     "syn_flag_count": flow["syn_flag_count"],
                     "fin_flag_count": flow["fin_flag_count"],
                     "rst_flag_count": flow["rst_flag_count"],
-                    "fwd_bwd_packet_ratio": (
-                        flow["forward_packets"] / flow["backward_packets"]
-                        if flow["backward_packets"] else 0.0
-                    ),
-                    "fwd_bwd_byte_ratio": (
-                        flow["forward_bytes"] / flow["backward_bytes"]
-                        if flow["backward_bytes"] else 0.0
-                    ),
-                    "fwd_bwd_avg_packet_length_ratio": (
-                        mean_fwd_length / mean_bwd_length if mean_bwd_length else 0.0
-                    ),
-                    "forward_packet_percentage": (
-                        flow["forward_packets"] / total_packets if total_packets else 0.0
-                    ),
-                    "forward_byte_percentage": (
-                        flow["forward_bytes"] / total_bytes if total_bytes else 0.0
-                    ),
-                    # Only true handshake observations qualify as initial windows.
+                    "fwd_bwd_packet_ratio": (flow["forward_packets"] / flow["backward_packets"]) if flow["backward_packets"] else 0.0,
+                    "fwd_bwd_byte_ratio": (flow["forward_bytes"] / flow["backward_bytes"]) if flow["backward_bytes"] else 0.0,
+                    "fwd_bwd_avg_packet_length_ratio": (mean_fwd_length / mean_bwd_length) if mean_bwd_length else 0.0,
+                    "forward_packet_percentage": (flow["forward_packets"] / total_packets) if total_packets else 0.0,
+                    "forward_byte_percentage": (flow["forward_bytes"] / total_bytes) if total_bytes else 0.0,
                     "initial_window_forward": flow["forward_initial_window"],
                     "initial_window_backward": flow["backward_initial_window"],
                     "active_min_seconds": active_min,
@@ -369,7 +529,6 @@ class LiveFlowMonitor:
                     "missing_features": [],
                     "prediction": None,
                 }
-
                 extracted = extract_live_features(result)
                 result["feature_extraction_ready"] = bool(extracted.get("ready"))
                 if not extracted.get("ready"):
@@ -382,18 +541,13 @@ class LiveFlowMonitor:
                         result["prediction"] = {
                             **prediction,
                             "source_ip": result["source_ip"],
-                            "status": (
-                                "Monitoring" if predicted_class == 0 else "Potential Threat"
-                            ),
+                            "status": ("Monitoring" if predicted_class == 0 else "Potential Threat"),
                             "mode": "passive_live_flow",
                         }
-                    except Exception as error:
-                        result["feature_extraction_reason"] = (
-                            f"Model prediction failed: {type(error).__name__}: {error}"
-                        )
+                    except Exception as err:
+                        result["feature_extraction_reason"] = f"Model prediction failed: {type(err).__name__}: {err}"
                 results.append(result)
-
             return results
 
-
+# Global monitor instance
 live_flow_monitor = LiveFlowMonitor()

@@ -77,9 +77,9 @@ def extract_live_features(flow):
     """Build candidate features without fabricating unavailable measurements.
 
     Duration and IAT fields are converted from seconds to microseconds.
-    TCP window values are deliberately not mapped to Init_Win_bytes_*:
-    the first observed packet may be from the middle of an existing flow.
-    Active/idle metrics are not available from the current monitor.
+    TCP window values are populated from observed SYN/SYN-ACK handshake packets.
+    For non-TCP flows, window sizes are not applicable and are populated with -1.0
+    matching the CICIDS2017 training dataset representation.
     """
     values = {}
 
@@ -134,11 +134,29 @@ def extract_live_features(flow):
     seconds_to_microseconds("Bwd IAT Max", "backward_iat_max_seconds")
     seconds_to_microseconds("Bwd IAT Min", "backward_iat_min_seconds")
 
-    # Window features are only populated by the monitor when the SYN / SYN-ACK
-    # handshake packets were actually observed. Otherwise validation keeps them missing.
+    # Window features: populated by the monitor when handshake packets were observed.
     copy_feature("Init_Win_bytes_forward", "initial_window_forward")
     copy_feature("Init_Win_bytes_backward", "initial_window_backward")
+
+    protocol = str(flow.get("protocol", "")).strip().upper()
+    if protocol not in ("TCP", "6"):
+        # For non-TCP flows only (e.g. UDP), TCP window size is not applicable
+        # and is represented as -1.0 matching the verified training-data representation.
+        if "Init_Win_bytes_forward" not in values or values["Init_Win_bytes_forward"] is None:
+            values["Init_Win_bytes_forward"] = -1.0
+        if "Init_Win_bytes_backward" not in values or values["Init_Win_bytes_backward"] is None:
+            values["Init_Win_bytes_backward"] = -1.0
+
     seconds_to_microseconds("Active Min", "active_min_seconds")
     seconds_to_microseconds("Active Mean", "active_mean_seconds")
+
+    packet_count = flow.get("packets")
+    if packet_count is None or packet_count <= 1:
+        # Flows with <= 1 packet genuinely have insufficient packet timestamps to calculate
+        # an activity interval; represent as 0.0 matching the training-data convention.
+        if "Active Min" not in values or values["Active Min"] is None:
+            values["Active Min"] = 0.0
+        if "Active Mean" not in values or values["Active Mean"] is None:
+            values["Active Mean"] = 0.0
 
     return validate_feature_values(values)

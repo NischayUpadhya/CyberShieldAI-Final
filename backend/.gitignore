@@ -24,6 +24,7 @@ ai/evaluation/
 ai/saved_models/
 *.pkl
 *.joblib
+!ai/models/saved/xgboost_baseline.joblib
 *.h5
 
 # ==========================

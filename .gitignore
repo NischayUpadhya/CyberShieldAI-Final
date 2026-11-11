@@ -220,5 +220,15 @@ __marimo__/
 # CyberShield AI - Runtime Blockchain Data
 backend/blockchain/data/
 
-# Large XGBoost test artifacts
-backend/ai/datasets/
+# Ignore datasets by default
+backend/ai/datasets/*
+
+# Include XGBoost test evaluation data
+!backend/ai/datasets/final/
+backend/ai/datasets/final/*
+!backend/ai/datasets/final/X_test.npy
+!backend/ai/datasets/final/y_test.npy
+
+# Node dependencies and frontend build
+node_modules/
+frontend/node_modules/

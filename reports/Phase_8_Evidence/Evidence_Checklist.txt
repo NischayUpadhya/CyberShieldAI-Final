@@ -1,0 +1,41 @@
+# CYBERSHIELD AI – PHASE 8 EVIDENCE CHECKLIST
+
+## A. Phase 8.1 – Integration Audit
+- [ ] Integration architecture or pipeline screenshot
+- [ ] Frontend integration audit findings
+- [ ] Backend integration audit findings
+- [ ] Known issues and limitations
+
+## B. Phase 8.2 – Component Testing
+- [ ] XGBoost benign prediction response
+- [ ] XGBoost DDoS prediction response
+- [ ] XGBoost PortScan prediction response
+- [ ] Invalid feature count response
+- [ ] Missing feature response
+- [ ] Non-numeric feature response
+- [ ] PPO model inference output
+- [ ] PPO observation shape verification
+- [ ] PPO action distribution and evaluation results
+- [ ] Model SHA-256 integrity verification
+
+## C. Phase 8.3 – End-to-End Testing
+- [ ] Test backend startup screenshot
+- [ ] Swagger documentation screenshot
+- [ ] Benign scenario API response
+- [ ] DDoS scenario API response
+- [ ] PortScan scenario API response
+- [ ] Web Attack - Brute Force API response
+- [ ] Blockchain records screenshot
+- [ ] Final 25-block blockchain verification output
+- [ ] Original 21-block ledger isolation verification
+
+## D. Reports
+- [x] Phase 8 Integration Testing Report
+- [ ] Evidence screenshots collected
+- [ ] Final evidence archive reviewed
+
+## Important Notes
+- Original project blockchain remained unchanged.
+- Integration testing was performed using the isolated test copy.
+- Defense actions were simulated, not applied to the operating-system firewall.
+- Do not fabricate missing screenshots or test outputs.

@@ -1,0 +1,240 @@
+# CYBERSHIELD AI
+# PHASE 8 – INTEGRATION TESTING REPORT
+
+## Project Overview
+
+Project: CyberShieldAI – Autonomous Cyber Defense using Reinforcement Learning and Blockchain
+
+Testing phase: Phase 8 – Integration Testing
+
+Testing environment: Isolated copy of the original project
+
+Original project:
+C:\final year\CyberShieldAI-Final
+
+Isolated test project:
+C:\final year\CyberShieldAI-Test
+
+Backend testing URL:
+http://127.0.0.1:8001
+
+## 1. Phase 8.1 – Integration Audit
+
+The integration audit examined the connection between the frontend, backend, XGBoost threat detection model, PPO reinforcement learning agent, defense simulation components and blockchain logging system.
+
+The audit confirmed the following pipeline:
+
+1. Network traffic and input features are processed.
+2. XGBoost classifies the incoming traffic.
+3. A 26-dimensional state is constructed for the PPO agent.
+4. PPO selects a defense action.
+5. The defense simulator processes the selected action.
+6. Security events are recorded in the blockchain ledger.
+7. Frontend components display the available system information.
+
+Key findings:
+- ThreatDetection is integrated with the defense analysis API.
+- BlockchainLogs retrieves blockchain records.
+- LiveMonitoring uses backend live-flow information.
+- Dashboard and Reports contain static or mock data.
+- Some frontend lint errors and error-handling limitations remain.
+
+Result: PASS WITH CAVEATS.
+
+## 2. Phase 8.2 – Component Runtime Testing
+
+### 2.1 XGBoost Runtime Testing
+
+Endpoint: POST /api/xgboost/predict
+
+Six runtime tests were completed:
+
+1. Benign input – passed.
+2. Genuine DDoS sample – passed.
+3. Genuine PortScan sample – passed.
+4. Incorrect feature count – correctly rejected.
+5. Missing features – correctly rejected.
+6. Non-numeric feature input – correctly rejected.
+
+The model expects exactly 40 numerical features.
+
+Result: PASS – 6/6 tests.
+
+### 2.2 PPO Runtime Testing
+
+The PPO model was tested through direct Python inference because there is no independent PPO-only API endpoint.
+
+Verified:
+- Model loading and inference.
+- Observation shape of 26 dimensions.
+- Action IDs from 0 to 4.
+- Deterministic prediction consistency.
+- Model file integrity before and after inference.
+- Inference performance.
+
+A genuine DDoS sample passed through XGBoost and PPO:
+- XGBoost prediction: DDoS.
+- Confidence: 0.9999.
+- PPO state shape: (26,).
+- PPO action: BLOCK (action ID 3).
+
+The model SHA-256 remained unchanged during inference:
+c82eb9bd0af5c0efb67923c42d234a65717ef214f7aac1b473c0f1e563a706a4
+
+Result: PASS WITH CAVEATS.
+
+### 2.3 Architecture and Implementation Audit
+
+The audit identified:
+- Production state inputs differ from some training-environment inputs.
+- Production uses fixed defaults for previous action and available resources.
+- Some network-context values are simulated rather than measured from live traffic.
+- Training logs were unavailable, so convergence could not be independently established.
+- The full evaluation showed a MONITOR-dominated action distribution.
+
+Result: PARTIAL PASS.
+
+## 3. Phase 8.3 – Controlled End-to-End Integration Testing
+
+### 3.1 Blockchain Isolation Audit
+
+The blockchain constructor uses a storage path relative to the blockchain module.
+
+The blockchain service initializes the ledger and saves new events by rewriting the JSON ledger file.
+
+The POST /api/defense/analyze endpoint records a blockchain event. Therefore, testing was performed using a separate project copy.
+
+Result: Separate-copy testing was required.
+
+### 3.2 Isolated Test Environment Preparation
+
+An isolated copy was created at:
+
+C:\final year\CyberShieldAI-Test
+
+The test environment used Python 3.10.11 and the required project dependencies.
+
+The test backend was started on port 8001.
+
+The initial blockchain contained 21 blocks, matching the original project's ledger.
+
+Result: PASS.
+
+### 3.3 Benign End-to-End Scenario
+
+Input: 40 numerical zero-valued features.
+
+Results:
+- XGBoost prediction: Benign.
+- Confidence: 0.9982.
+- PPO state shape: 26.
+- PPO action: MONITOR.
+- Defense simulation: Successful.
+- Blockchain block index: 21.
+
+The event was successfully recorded in the isolated blockchain.
+
+Result: PASS.
+
+### 3.4 Controlled Attack Scenarios
+
+Three genuine held-out attack samples were tested through the complete integration pipeline.
+
+#### Test 1 – DDoS
+
+Ground-truth class: 2
+
+Results:
+- XGBoost prediction: DDoS.
+- Confidence: 0.9999.
+- PPO action: BLOCK.
+- Defense simulation: Successful.
+- Threat reduction: 0.80.
+- Response effectiveness: 0.7633.
+- Blockchain block index: 22.
+
+Result: PASS.
+
+#### Test 2 – PortScan
+
+Ground-truth class: 10
+
+Results:
+- XGBoost prediction: PortScan.
+- Confidence: 0.9999.
+- PPO action: BLOCK.
+- Defense simulation: Successful.
+- Threat reduction: 0.80.
+- Response effectiveness: 0.6557.
+- Blockchain block index: 23.
+
+Result: PASS.
+
+#### Test 3 – Web Attack: Brute Force
+
+Ground-truth class: 12
+
+Dataset sample:
+- Selected row: 1051.
+- Available class samples: 220.
+- Feature count: 40.
+- All feature values finite.
+
+Results:
+- XGBoost prediction: Web Attack - Brute Force.
+- Confidence: 0.8644.
+- PPO action: BLOCK.
+- Defense simulation: Successful.
+- Threat reduction: 0.80.
+- Response effectiveness: 0.5460.
+- Blockchain block index: 24.
+
+Result: PASS.
+
+## 4. Consolidated End-to-End Results
+
+| Scenario | Ground Truth | XGBoost Prediction | PPO Action | Result |
+|---|---|---|---|---|
+| Benign | Class 0 | Benign | MONITOR | PASS |
+| DDoS | Class 2 | DDoS | BLOCK | PASS |
+| PortScan | Class 10 | PortScan | BLOCK | PASS |
+| Web Attack - Brute Force | Class 12 | Web Attack - Brute Force | BLOCK | PASS |
+
+All four tested scenarios completed the end-to-end pipeline successfully.
+
+## 5. Blockchain Integrity and Isolation Verification
+
+Final verification results:
+
+- Original blockchain block count: 21.
+- Test blockchain block count: 25.
+- Hash and link errors: 0.
+- Test blockchain integrity: VALID.
+- Original ledger matches the first 21 test-copy blocks: TRUE.
+- Original block count unchanged: TRUE.
+- Isolation result: PASS.
+
+All 25 blocks in the test-copy ledger passed independent hash and previous-hash link verification.
+
+## 6. Known Limitations
+
+1. Only four controlled scenarios were tested end to end.
+2. Defense actions are simulated and do not enforce actual operating-system firewall rules.
+3. Blockchain storage is a local JSON hash-linked ledger, not a decentralized blockchain network.
+4. PPO training convergence could not be verified because training logs were unavailable.
+5. The PPO policy showed a MONITOR-dominated action distribution in the full environment evaluation.
+6. Production state construction contains differences from training-environment state construction.
+7. Some frontend pages still use mock or static data.
+8. The tests do not establish production-level cybersecurity effectiveness.
+
+## 7. Final Conclusion
+
+Phase 8 validated the integration of the XGBoost threat detection model, PPO reinforcement learning agent, simulated defense mechanism and blockchain event logging component.
+
+Four controlled scenarios—Benign, DDoS, PortScan and Web Attack - Brute Force—successfully passed through the end-to-end integration pipeline.
+
+The isolated blockchain contained 25 valid blocks after testing. Independent verification confirmed that all hashes and previous-hash links were correct. The original project's blockchain remained unchanged at 21 blocks.
+
+Therefore, the controlled integration testing phase was successfully completed, subject to the limitations documented in this report.
+
+END OF REPORT

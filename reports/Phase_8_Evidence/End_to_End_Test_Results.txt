@@ -1,0 +1,71 @@
+# CYBERSHIELD AI – END-TO-END TEST EVIDENCE
+
+## Test Environment
+- Project: CyberShieldAI
+- Environment: Isolated test copy
+- Backend: http://127.0.0.1:8001
+- Endpoint: POST /api/defense/analyze
+- Original blockchain: 21 blocks before testing
+
+## Test 1 – Benign
+- Ground truth: Class 0 – Benign
+- XGBoost prediction: Benign
+- Confidence: 0.9982
+- PPO action: MONITOR (0)
+- Defense simulation: Successful
+- Blockchain block index: 21
+
+## Test 2 – DDoS
+- Ground truth: Class 2 – DDoS
+- XGBoost prediction: DDoS
+- Confidence: 0.9999
+- PPO action: BLOCK (3)
+- Defense simulation: Successful
+- Threat reduction: 0.8000
+- Traffic reduction: 0.7266
+- Response effectiveness: 0.7633
+- Blockchain block index: 22
+- Blockchain hash: 79cce1085d105a9898a9e2e556399527690bfcecbd3dd24496e8337417304cc9
+
+## Test 3 – PortScan
+- Ground truth: Class 10 – PortScan
+- XGBoost prediction: PortScan
+- Confidence: 0.9999
+- PPO action: BLOCK (3)
+- Defense simulation: Successful
+- Threat reduction: 0.8000
+- Traffic reduction: 0.5115
+- Response effectiveness: 0.6557
+- Blockchain block index: 23
+- Blockchain hash: 8a4174cf7d5e707057d8fff8e7411eea552412b2e1785d7d0bd54ba339fefabe
+
+## Test 4 – Web Attack - Brute Force
+- Ground truth: Class 12 – Web Attack - Brute Force
+- Held-out dataset row: 1051
+- XGBoost prediction: Web Attack - Brute Force
+- Confidence: 0.8644
+- PPO action: BLOCK (3)
+- Defense simulation: Successful
+- Threat reduction: 0.8000
+- Traffic reduction: 0.2919
+- Response effectiveness: 0.5460
+- Blockchain block index: 24
+- Blockchain hash: e9e78526b5e9a076e13e9b90186d0a4f6c5ec47fd0ced4a0fc2a7e00f807881a
+
+## Final Blockchain Verification
+- Original block count: 21
+- Test-copy block count: 25
+- Hash/link errors: 0
+- Test chain: VALID
+- Original matches first 21 test-copy blocks: TRUE
+- Original block count unchanged: TRUE
+- Isolation result: PASS
+
+## Interpretation
+All four controlled scenarios completed the integrated XGBoost, PPO, simulated defense and blockchain recording pipeline.
+
+The blockchain integrity check passed for all 25 blocks. The original blockchain remained unchanged.
+
+Defense actions were executed in simulation mode and were not applied to the actual operating-system firewall.
+
+END OF EVIDENCE

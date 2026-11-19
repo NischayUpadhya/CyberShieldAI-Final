@@ -1,0 +1,292 @@
+[
+    {
+        "index": 0,
+        "timestamp": "2026-10-06T18:20:42.804483+00:00",
+        "event": {
+            "event": "Genesis Block",
+            "description": "CyberShield AI Blockchain Initialized"
+        },
+        "previous_hash": "0",
+        "hash": "6c5a13d40a9d65058e06cf423ccbd53832a3c278f62e121976d57e1f54b70361"
+    },
+    {
+        "index": 1,
+        "timestamp": "2026-10-06T18:24:03.449046+00:00",
+        "event": {
+            "attack_type": "DDoS",
+            "source_ip": "192.168.1.100",
+            "severity": "High",
+            "xgboost_confidence": 0.98,
+            "ppo_action": "BLOCK",
+            "timestamp": "2026-10-06T18:24:03.449032+00:00"
+        },
+        "previous_hash": "6c5a13d40a9d65058e06cf423ccbd53832a3c278f62e121976d57e1f54b70361",
+        "hash": "37e3151c835fc49a4c68c85f0dd221a39fda3445f683385f208117bf785c11c8"
+    },
+    {
+        "index": 2,
+        "timestamp": "2026-10-06T18:42:45.813325+00:00",
+        "event": {
+            "attack_type": "PortScan",
+            "source_ip": "10.0.0.25",
+            "severity": "Medium",
+            "xgboost_confidence": 0.94,
+            "ppo_action": "RATE_LIMIT",
+            "timestamp": "2026-10-06T18:42:45.813315+00:00"
+        },
+        "previous_hash": "37e3151c835fc49a4c68c85f0dd221a39fda3445f683385f208117bf785c11c8",
+        "hash": "1567e6cf58b4d92ce37da613387cad0c28da133a385b0eb11d298dc1cbf04b1a"
+    },
+    {
+        "index": 3,
+        "timestamp": "2026-10-06T19:01:39.236733+00:00",
+        "event": {
+            "attack_type": "Benign",
+            "source_ip": "10.0.0.25",
+            "severity": "High",
+            "xgboost_confidence": 0.9982,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-10-06T19:01:39.236733+00:00"
+        },
+        "previous_hash": "1567e6cf58b4d92ce37da613387cad0c28da133a385b0eb11d298dc1cbf04b1a",
+        "hash": "651577f4ec8ecdf562c86be755decf11b2f5615eb04aee6d83fd168b5cca4ae8"
+    },
+    {
+        "index": 4,
+        "timestamp": "2026-10-06T19:09:38.790100+00:00",
+        "event": {
+            "attack_type": "Benign",
+            "source_ip": "10.0.0.25",
+            "severity": "High",
+            "xgboost_confidence": 1.0,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-10-06T19:09:38.790100+00:00"
+        },
+        "previous_hash": "651577f4ec8ecdf562c86be755decf11b2f5615eb04aee6d83fd168b5cca4ae8",
+        "hash": "045a3a30f0e5e742918a352c963a648e50413911eaca0b4c14fb51e2a40450eb"
+    },
+    {
+        "index": 5,
+        "timestamp": "2026-10-06T19:10:49.515952+00:00",
+        "event": {
+            "attack_type": "DDoS",
+            "source_ip": "10.0.0.50",
+            "severity": "High",
+            "xgboost_confidence": 0.9999,
+            "ppo_action": "BLOCK",
+            "timestamp": "2026-10-06T19:10:49.515952+00:00"
+        },
+        "previous_hash": "045a3a30f0e5e742918a352c963a648e50413911eaca0b4c14fb51e2a40450eb",
+        "hash": "1161150d52b043a61e68c9eb1c6089c7b38106ec709ce1c9e0e88ccfc7f95442"
+    },
+    {
+        "index": 6,
+        "timestamp": "2026-10-08T16:20:42.677120+00:00",
+        "event": {
+            "attack_type": "DDoS",
+            "source_ip": "10.0.0.25",
+            "severity": "High",
+            "xgboost_confidence": 0.9999,
+            "ppo_action": "BLOCK",
+            "timestamp": "2026-10-08T16:20:42.677120+00:00"
+        },
+        "previous_hash": "1161150d52b043a61e68c9eb1c6089c7b38106ec709ce1c9e0e88ccfc7f95442",
+        "hash": "1b5d6ec6d17084003277bd05a6c0e75c77a5e205fd06398a9b23dc8dc88fcdce"
+    },
+    {
+        "index": 7,
+        "timestamp": "2026-10-08T16:31:12.196359+00:00",
+        "event": {
+            "attack_type": "Benign",
+            "source_ip": "192.168.1.100",
+            "severity": "Low",
+            "xgboost_confidence": 0.9976,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-10-08T16:31:12.196359+00:00"
+        },
+        "previous_hash": "1b5d6ec6d17084003277bd05a6c0e75c77a5e205fd06398a9b23dc8dc88fcdce",
+        "hash": "967d7e9bc352fe147187ff61f3c0c4bbd4949f69bba1c65e9b02176922e54389"
+    },
+    {
+        "index": 8,
+        "timestamp": "2026-10-08T16:33:40.523275+00:00",
+        "event": {
+            "attack_type": "Benign",
+            "source_ip": "192.168.1.100",
+            "severity": "Low",
+            "xgboost_confidence": 0.9976,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-10-08T16:33:40.523275+00:00"
+        },
+        "previous_hash": "967d7e9bc352fe147187ff61f3c0c4bbd4949f69bba1c65e9b02176922e54389",
+        "hash": "dcae18adc3ad677b265eb38c2db1043dfdeb3568f2b56859db2ed471af9a5938"
+    },
+    {
+        "index": 9,
+        "timestamp": "2026-10-08T16:36:15.400861+00:00",
+        "event": {
+            "attack_type": "Benign",
+            "source_ip": "192.168.1.100",
+            "severity": "Low",
+            "xgboost_confidence": 0.9976,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-10-08T16:36:15.399860+00:00"
+        },
+        "previous_hash": "dcae18adc3ad677b265eb38c2db1043dfdeb3568f2b56859db2ed471af9a5938",
+        "hash": "0678985574af6e6a0162b46a6437f097ce181e7b9683c2e3fb1a9eb90cbcb5b1"
+    },
+    {
+        "index": 10,
+        "timestamp": "2026-10-22T16:17:19.245195+00:00",
+        "event": {
+            "attack_type": "Benign",
+            "source_ip": "string",
+            "severity": "Low",
+            "xgboost_confidence": 0.9982,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-10-22T16:17:19.244195+00:00"
+        },
+        "previous_hash": "0678985574af6e6a0162b46a6437f097ce181e7b9683c2e3fb1a9eb90cbcb5b1",
+        "hash": "ad7487f1817341607b26ff778d06e7f651ac063a88935653276432e146988082"
+    },
+    {
+        "index": 11,
+        "timestamp": "2026-10-22T16:17:26.663027+00:00",
+        "event": {
+            "attack_type": "Benign",
+            "source_ip": "string",
+            "severity": "Low",
+            "xgboost_confidence": 0.9982,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-10-22T16:17:26.662026+00:00"
+        },
+        "previous_hash": "ad7487f1817341607b26ff778d06e7f651ac063a88935653276432e146988082",
+        "hash": "a66177d643f4b48bf5535adf9b75fd63c1ef53c62105c329bc9dff7fb370a653"
+    },
+    {
+        "index": 12,
+        "timestamp": "2026-10-23T17:55:09.983002+00:00",
+        "event": {
+            "attack_type": "DoS Slowhttptest",
+            "source_ip": "192.0.2.20",
+            "severity": "High",
+            "xgboost_confidence": 0.562,
+            "ppo_action": "BLOCK",
+            "timestamp": "2026-10-23T17:55:09.980002+00:00"
+        },
+        "previous_hash": "a66177d643f4b48bf5535adf9b75fd63c1ef53c62105c329bc9dff7fb370a653",
+        "hash": "97a0866c058f476062b981c4bfe09548951a3ceeef6aaee485833822d8c4e9c0"
+    },
+    {
+        "index": 13,
+        "timestamp": "2026-10-23T18:29:59.428246+00:00",
+        "event": {
+            "attack_type": "DoS Slowhttptest",
+            "source_ip": "192.0.2.20",
+            "severity": "High",
+            "xgboost_confidence": 0.562,
+            "ppo_action": "BLOCK",
+            "timestamp": "2026-10-23T18:29:59.426250+00:00"
+        },
+        "previous_hash": "97a0866c058f476062b981c4bfe09548951a3ceeef6aaee485833822d8c4e9c0",
+        "hash": "72d94463916ae1a015debd3879b82cca1825cf6861971443e602e011f2b4a5a9"
+    },
+    {
+        "index": 14,
+        "timestamp": "2026-10-23T18:33:48.966665+00:00",
+        "event": {
+            "attack_type": "DoS Slowhttptest",
+            "source_ip": "192.0.2.20",
+            "severity": "High",
+            "xgboost_confidence": 0.562,
+            "ppo_action": "BLOCK",
+            "timestamp": "2026-10-23T18:33:48.963545+00:00"
+        },
+        "previous_hash": "72d94463916ae1a015debd3879b82cca1825cf6861971443e602e011f2b4a5a9",
+        "hash": "15102aeee85f831649f82fb5c2417fbb4f2f907515d3cc147ac82ad6bfdff0d0"
+    },
+    {
+        "index": 15,
+        "timestamp": "2026-10-24T08:07:04.681393+00:00",
+        "event": {
+            "attack_type": "DoS Slowhttptest",
+            "source_ip": "192.0.2.20",
+            "severity": "High",
+            "xgboost_confidence": 0.562,
+            "ppo_action": "BLOCK",
+            "timestamp": "2026-10-24T08:07:04.679394+00:00"
+        },
+        "previous_hash": "15102aeee85f831649f82fb5c2417fbb4f2f907515d3cc147ac82ad6bfdff0d0",
+        "hash": "094bbbe787e7bbefc7ef03847947c00c76d192fcebcff293f4035b50163f5205"
+    },
+    {
+        "index": 16,
+        "timestamp": "2026-10-24T08:52:56.592788+00:00",
+        "event": {
+            "attack_type": "DoS Slowhttptest",
+            "source_ip": "192.0.2.20",
+            "severity": "High",
+            "xgboost_confidence": 0.562,
+            "ppo_action": "BLOCK",
+            "timestamp": "2026-10-24T08:52:56.590788+00:00"
+        },
+        "previous_hash": "094bbbe787e7bbefc7ef03847947c00c76d192fcebcff293f4035b50163f5205",
+        "hash": "7a4630811dd853d9dbaccc8983f5e4d9020bec6d20f17f5056dea54cee5382f6"
+    },
+    {
+        "index": 17,
+        "timestamp": "2026-11-10T07:29:21.307855+00:00",
+        "event": {
+            "attack_type": "Benign",
+            "source_ip": "10.0.0.99",
+            "severity": "Low",
+            "xgboost_confidence": 0.9999,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-11-10T07:29:21.306223+00:00"
+        },
+        "previous_hash": "7a4630811dd853d9dbaccc8983f5e4d9020bec6d20f17f5056dea54cee5382f6",
+        "hash": "72ef57e5bee937874e5fc44c2962cc27bcefc627157119a681b192c616340d7e"
+    },
+    {
+        "index": 18,
+        "timestamp": "2026-11-10T07:29:21.379626+00:00",
+        "event": {
+            "attack_type": "AUDIT_TEST_EVENT_PHASE_4",
+            "source_ip": "127.0.0.1",
+            "severity": "Low",
+            "xgboost_confidence": 0.95,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-11-10T07:29:21.378626+00:00"
+        },
+        "previous_hash": "72ef57e5bee937874e5fc44c2962cc27bcefc627157119a681b192c616340d7e",
+        "hash": "9ce3e9f861241d0514aa6e49e69e41c7cff588af6571f009493d5f4460e0f765"
+    },
+    {
+        "index": 19,
+        "timestamp": "2026-11-10T07:30:45.055768+00:00",
+        "event": {
+            "attack_type": "Benign",
+            "source_ip": "10.0.0.99",
+            "severity": "Low",
+            "xgboost_confidence": 0.9999,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-11-10T07:30:45.054768+00:00"
+        },
+        "previous_hash": "9ce3e9f861241d0514aa6e49e69e41c7cff588af6571f009493d5f4460e0f765",
+        "hash": "6277eb2e4b4258eb7975991efa7530a76a082f013c0b44b64c638b00123b7b1a"
+    },
+    {
+        "index": 20,
+        "timestamp": "2026-11-10T07:30:45.092295+00:00",
+        "event": {
+            "attack_type": "AUDIT_TEST_EVENT_PHASE_4",
+            "source_ip": "127.0.0.1",
+            "severity": "Low",
+            "xgboost_confidence": 0.95,
+            "ppo_action": "MONITOR",
+            "timestamp": "2026-11-10T07:30:45.090294+00:00"
+        },
+        "previous_hash": "6277eb2e4b4258eb7975991efa7530a76a082f013c0b44b64c638b00123b7b1a",
+        "hash": "4161c9017323321063b47f44885a0c446869a247e4d129c7df03034ca3c53976"
+    }
+]

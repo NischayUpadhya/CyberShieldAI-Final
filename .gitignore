@@ -218,7 +218,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 # CyberShield AI - Runtime Blockchain Data
-backend/blockchain/data/
+backend/blockchain/data/*
+!backend/blockchain/data/blockchain.json
 
 # Ignore datasets by default
 backend/ai/datasets/*
